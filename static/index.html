@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=2">
+<link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
 
@@ -717,20 +717,26 @@ function roleScore(r) {
 
 function renderLeaderboard(teams) {
     const container = document.getElementById('leaderboard');
-    container.innerHTML = teams.map((team, i) => {
+    const sorted = [...teams].sort((a, b) => teamScore(a) - teamScore(b));
+    container.innerHTML = sorted.map((team, i) => {
         const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
-        const members = team.roles.map(r =>
-            `<span class="role-badge ${r.role}">${r.role}</span> ${r.player_name} (${r.strategy}) — ${roleScore(r).toFixed(2)} EUR`
-        ).join('<br>');
-        return `<div class="leaderboard-item" onclick="this.nextElementSibling.classList.toggle('open')">
+        const memberRows = team.roles.map(r =>
+            `<div class="bar-row">
+                <div class="bar-label"><span class="role-badge ${r.role}">${r.role}</span> <span class="text-muted text-xs">${r.player_name}</span></div>
+                <div class="bar-track"><div class="bar-fill medium" style="width:${Math.min(Math.max(roleScore(r) / Math.max(...team.roles.map(roleScore), 1) * 100, 8), 100)}%">${roleScore(r).toFixed(2)} EUR</div></div>
+            </div>`
+        ).join('');
+        return `<div class="leaderboard-item" onclick="(this.nextElementSibling||{}).classList && this.nextElementSibling.classList.toggle('open')">
             <div class="lb-rank ${rankClass}">${i+1}</div>
             <div class="lb-info">
                 <div class="team-name">${team.name}</div>
-                <div class="team-members">${team.roles.map(r => r.player_name).join(', ')}</div>
+                <div class="team-members">${team.roles.map(r => r.player_name).join(' · ')}</div>
             </div>
-            <div class="lb-cost">${teamScore(team).toFixed(2)} EUR</div>
+            <div class="lb-cost">${teamScore(team).toFixed(2)}<span class="unit">EUR Total</span></div>
         </div>
-        <div class="lb-details"><div class="text-sm">${members}</div></div>`;
+        <div class="lb-details">
+            <div class="bar-chart">${memberRows}</div>
+        </div>`;
     }).join('');
 }
 
@@ -738,21 +744,29 @@ function renderPrizes(prizes, containerId, cardId) {
     const el = document.getElementById(containerId);
     const card = document.getElementById(cardId);
     if (!el || !prizes || !prizes.best_team) { if (card) card.style.display = 'none'; return; }
-    if (card) card.style.display = '';
+    if (card) { card.style.display = ''; card.classList.add('prizes-card'); }
     const bt = prizes.best_team;
-    const roleRows = Object.values(prizes.best_per_role || {}).map(p => `
-        <div class="team-cost-row">
-            <span><span class="role-badge ${p.role}">${p.role}</span> <strong>${p.player_name}</strong> <span class="text-muted">(${p.team_name})</span></span>
-            <span class="cost-cell">${p.scored_cost.toFixed(2)} EUR</span>
+    const roleCards = Object.values(prizes.best_per_role || {}).map(p => `
+        <div class="role-winner-card">
+            <span class="role-badge ${p.role}">${p.role}</span>
+            <div class="winner-info">
+                <div class="winner-name">${p.player_name}</div>
+                <div class="winner-team">${p.team_name}</div>
+            </div>
+            <div class="winner-cost">${p.scored_cost.toFixed(2)}</div>
         </div>`).join('');
     el.innerHTML = `
-        <div class="team-cost-row" style="font-size:16px">
-            <span>&#129351; <strong>Best Team:</strong> ${bt.team_name} <span class="text-muted">(${(bt.player_names||[]).join(', ')})</span></span>
-            <span class="cost-cell">${bt.scored_cost.toFixed(2)} EUR</span>
+        <div class="best-team-banner">
+            <div class="medal">🏆</div>
+            <div class="info">
+                <div class="label">Champion Team</div>
+                <div class="team">${bt.team_name}</div>
+                <div class="members">${(bt.player_names||[]).join(' · ')}</div>
+            </div>
+            <div class="cost">${bt.scored_cost.toFixed(2)}<span class="unit">EUR Total</span></div>
         </div>
-        <div class="divider"></div>
-        <h3 style="margin-top:8px">Best Individual per Role</h3>
-        ${roleRows}`;
+        <div class="role-winners-title">⭐ Best Individual per Role</div>
+        <div class="role-winners">${roleCards}</div>`;
 }
 
 // ── Professor: Results ─────────────────────────────────
@@ -770,31 +784,30 @@ function handleGameFinished(msg) {
 
 function renderFinalResults(teams) {
     const container = document.getElementById('finalLeaderboard');
-    container.innerHTML = teams.map((team, i) => {
+    // Sort by score ascending (lower cost = better)
+    const sorted = [...teams].sort((a, b) => teamScore(a) - teamScore(b));
+    container.innerHTML = sorted.map((team, i) => {
         const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
         const maxCost = Math.max(...team.roles.map(r => roleScore(r)), 1);
         const rolesHtml = team.roles.map(r => {
             const c = roleScore(r);
             const pct = Math.min((c / maxCost) * 100, 100);
             return `<div class="bar-row">
-                <div class="bar-label"><span class="role-badge ${r.role}">${r.role}</span></div>
-                <div class="bar-track"><div class="bar-fill medium" style="width:${pct}%">${c.toFixed(2)} EUR</div></div>
+                <div class="bar-label"><span class="role-badge ${r.role}">${r.role}</span> <span class="text-muted text-xs">${r.player_name}</span></div>
+                <div class="bar-track"><div class="bar-fill medium" style="width:${Math.max(pct, 8)}%">${c.toFixed(2)} EUR</div></div>
             </div>`;
         }).join('');
 
-        return `<div class="leaderboard-item" onclick="this.nextElementSibling.classList.toggle('open')">
+        return `<div class="leaderboard-item" onclick="(this.nextElementSibling||{}).classList && this.nextElementSibling.classList.toggle('open')">
             <div class="lb-rank ${rankClass}">${i+1}</div>
             <div class="lb-info">
                 <div class="team-name">${team.name}</div>
-                <div class="team-members">${team.roles.map(r => r.player_name).join(', ')}</div>
+                <div class="team-members">${team.roles.map(r => r.player_name).join(' · ')}</div>
             </div>
-            <div class="lb-cost">${teamScore(team).toFixed(2)} EUR</div>
+            <div class="lb-cost">${teamScore(team).toFixed(2)}<span class="unit">EUR Total</span></div>
         </div>
         <div class="lb-details">
             <div class="bar-chart">${rolesHtml}</div>
-            <div class="team-cost-total mt-12">
-                <span>Total (scored, warmup excluded)</span><span class="value">${teamScore(team).toFixed(2)} EUR</span>
-            </div>
         </div>`;
     }).join('');
 }
