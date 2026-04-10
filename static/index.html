@@ -1012,8 +1012,18 @@ function updateStudentRoundProgress(round, total) {
 function toggleFullscreen() {
     const b = document.getElementById('gameBoard');
     b.classList.toggle('fullscreen');
-    b.querySelector('.fullscreen-btn').textContent = b.classList.contains('fullscreen') ? '✕ Exit' : '⛶ Fullscreen';
+    const isFs = b.classList.contains('fullscreen');
+    b.querySelector('.fullscreen-btn').textContent = isFs ? '✕ Exit Fullscreen (ESC)' : '⛶ Fullscreen';
+    document.body.style.overflow = isFs ? 'hidden' : '';
 }
+
+// ESC key exits fullscreen
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const b = document.getElementById('gameBoard');
+        if (b && b.classList.contains('fullscreen')) toggleFullscreen();
+    }
+});
 
 // SVG Building generators
 function svgRetailer(x, y) {
