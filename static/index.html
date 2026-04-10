@@ -184,6 +184,7 @@
         <p style="font-size:18px;margin-top:8px">players joined</p>
         <p class="text-muted mt-12 pulse">Waiting for the professor to start<span class="waiting-dots"></span></p>
         <p class="mt-16" style="font-size:16px">Welcome, <strong id="welcomeName"></strong>!</p>
+        <p class="mt-8" style="font-size:14px;color:var(--text-light)" id="gamesRemainingInfo"></p>
     </div>
 </div>
 
@@ -651,7 +652,24 @@ async function joinGame() {
     localStorage.setItem('beer_player_id', APP.playerId);
     localStorage.setItem('beer_player_name', APP.playerName);
     document.getElementById('welcomeName').textContent = name;
+    // Fetch fresh state so we can show games_remaining
+    try {
+        const s = await (await fetch('/api/state')).json();
+        const player = s.players && s.players[APP.playerId];
+        if (player) updateGamesRemaining(player, s);
+    } catch (e) {}
     showScreen('screen-student-waiting');
+}
+
+function updateGamesRemaining(player, s) {
+    const el = document.getElementById('gamesRemainingInfo');
+    if (!el || !player) return;
+    const max = (s.settings && s.settings.max_games_per_player) || 0;
+    const played = player.games_played || 0;
+    const remaining = player.games_remaining != null ? player.games_remaining : Math.max(0, max - played);
+    if (max > 0) {
+        el.textContent = `Games remaining: ${remaining} of ${max}`;
+    }
 }
 
 function handleReconnect(s) {
@@ -667,6 +685,7 @@ function handleReconnect(s) {
     }
 
     document.getElementById('welcomeName').textContent = APP.playerName;
+    updateGamesRemaining(player, s);
 
     if (s.phase === 'lobby') showScreen('screen-student-waiting');
     else if (s.phase === 'designing') {

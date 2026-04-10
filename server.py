@@ -38,6 +38,8 @@ state = {
         "step_demand_after": 8,
         "step_round": 5,             # demand changes at this round (1-indexed)
         "demand_std": 2,             # standard deviation (only used for step_variance)
+        "warmup_rounds": 3,          # first N rounds don't count for scoring
+        "max_games_per_player": 3,   # how many games each student may start
     },
     "players": {},       # {player_id: {name, roles:[], strategies:{}, locked_in:bool}}
     "teams": [],         # [{id, name, members:[], role_map:{role: player_id}}]
@@ -50,6 +52,41 @@ state = {
 ws_clients: list[WebSocket] = []
 
 ROLES = ["Retailer", "Wholesaler", "Distributor", "Manufacturer"]
+
+# ── Persistence (JSON snapshot) ──────────────────────────────────────────────
+# Render free tier has ephemeral storage; this still survives WebSocket drops
+# and browser-close reconnects within the container lifetime.
+
+STATE_FILE = os.environ.get("BEERGAME_STATE_FILE",
+                            os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_state.json"))
+
+
+def save_state() -> None:
+    try:
+        snapshot = {k: v for k, v in state.items() if k != "api_key"}
+        # api_key kept separately so it's never written to disk
+        with open(STATE_FILE, "w") as f:
+            json.dump(snapshot, f)
+    except Exception as e:
+        print(f"[persist] save failed: {e}")
+
+
+def load_state() -> None:
+    if not os.path.exists(STATE_FILE):
+        return
+    try:
+        with open(STATE_FILE) as f:
+            snapshot = json.load(f)
+        for k, v in snapshot.items():
+            state[k] = v
+        # Pick up API key from env on restart
+        state["api_key"] = os.environ.get("ANTHROPIC_API_KEY", state.get("api_key"))
+        # If server crashed mid-game, revert to designing so players can resume
+        if state.get("phase") == "playing":
+            state["phase"] = "designing"
+        print(f"[persist] restored state: phase={state.get('phase')}, players={len(state.get('players', {}))}")
+    except Exception as e:
+        print(f"[persist] load failed: {e}")
 
 
 # ── Demand generation ─────────────────────────────────────────────────────────
@@ -307,6 +344,8 @@ async def run_game():
             tasks.append(process_team_round(team, team_states[team["id"]], round_num, customer_demand, settings))
         await asyncio.gather(*tasks)
 
+        save_state()
+
         # Broadcast round results
         await broadcast({
             "type": "round_complete",
@@ -320,6 +359,7 @@ async def run_game():
 
     # Game finished
     state["phase"] = "finished"
+    save_state()
     await broadcast({
         "type": "game_finished",
         "teams": get_teams_summary(),
@@ -526,7 +566,9 @@ async def broadcast(msg: dict):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_state()
     yield
+    save_state()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -564,6 +606,7 @@ async def create_session(body: dict):
     state["created_at"] = time.time()
     state["demand_sequence"] = generate_demand_sequence(state["settings"])
 
+    save_state()
     await broadcast({"type": "session_created", "session_id": state["session_id"]})
     return {"session_id": state["session_id"], "settings": state["settings"]}
 
@@ -577,6 +620,7 @@ async def update_settings(body: dict):
         if k in state["settings"]:
             state["settings"][k] = v
     state["demand_sequence"] = generate_demand_sequence(state["settings"])
+    save_state()
     await broadcast({"type": "settings_updated", "settings": state["settings"]})
     return {"settings": state["settings"]}
 
@@ -589,6 +633,12 @@ async def join_game(body: dict):
     if state["phase"] != "lobby":
         return JSONResponse({"error": "Game not in lobby phase"}, status_code=400)
 
+    # If a player with this exact name already exists, return their existing id
+    # so that a rejoin (from localStorage-less new device) still works.
+    for pid, p in state["players"].items():
+        if p["name"].lower() == name.lower():
+            return {"player_id": pid, "name": p["name"], "rejoined": True}
+
     player_id = str(uuid.uuid4())[:8]
     state["players"][player_id] = {
         "name": name,
@@ -596,7 +646,9 @@ async def join_game(body: dict):
         "strategies": {},
         "custom_prompts": {},
         "locked_in": False,
+        "games_played": 0,
     }
+    save_state()
     await broadcast({
         "type": "player_joined",
         "player_id": player_id,
@@ -617,6 +669,7 @@ async def start_game():
 
     state["teams"] = assign_teams(state["players"])
     state["phase"] = "designing"
+    save_state()
 
     teams_info = []
     for team in state["teams"]:
@@ -648,6 +701,7 @@ async def lock_in(body: dict):
             player["custom_prompts"][role] = custom_prompts.get(role, "")
 
     player["locked_in"] = True
+    save_state()
 
     total = len(state["players"])
     locked = sum(1 for p in state["players"].values() if p["locked_in"])
@@ -669,6 +723,11 @@ async def begin_game():
 
     state["phase"] = "playing"
     state["demand_sequence"] = generate_demand_sequence(state["settings"])
+
+    # Count this as a game-played for every participating student
+    for pid in state["players"]:
+        state["players"][pid]["games_played"] = state["players"][pid].get("games_played", 0) + 1
+    save_state()
 
     await broadcast({"type": "game_begin", "total_rounds": state["settings"]["rounds"]})
 
@@ -696,6 +755,7 @@ async def restart_game():
             members.append({"id": pid, "name": p["name"], "roles": p["roles"]})
         teams_info.append({"id": team["id"], "name": team["name"], "members": members, "role_map": team["role_map"]})
 
+    save_state()
     await broadcast({"type": "game_restarted", "teams": teams_info})
     return {"status": "designing"}
 
@@ -712,14 +772,22 @@ async def new_game():
         p["strategies"] = {}
         p["custom_prompts"] = {}
         p["locked_in"] = False
+    save_state()
     await broadcast({"type": "new_game", "player_count": len(state["players"])})
     return {"status": "lobby"}
 
 
 @app.get("/api/state")
 async def get_state():
-    players_info = {pid: {"name": p["name"], "roles": p["roles"], "locked_in": p["locked_in"], "strategies": p["strategies"]}
-                    for pid, p in state["players"].items()}
+    max_games = state["settings"].get("max_games_per_player", 3)
+    players_info = {pid: {
+        "name": p["name"],
+        "roles": p["roles"],
+        "locked_in": p["locked_in"],
+        "strategies": p["strategies"],
+        "games_played": p.get("games_played", 0),
+        "games_remaining": max(0, max_games - p.get("games_played", 0)),
+    } for pid, p in state["players"].items()}
     teams_info = []
     for team in state["teams"]:
         members = []

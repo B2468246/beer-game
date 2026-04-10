@@ -5,6 +5,7 @@ __pycache__/
 .DS_Store
 .env
 classroom.db
+game_state.json
 .vscode/
 .idea/
 static/.Rhistory
