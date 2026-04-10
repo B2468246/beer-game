@@ -859,6 +859,20 @@ async def new_game():
     return {"status": "lobby"}
 
 
+@app.post("/api/kick-all")
+async def kick_all_players():
+    """Professor action: remove ALL players, teams, and game data. Reset to empty lobby."""
+    kicked_count = len(state["players"])
+    state["players"] = {}
+    state["teams"] = []
+    state["rounds_data"] = {}
+    state["current_round"] = 0
+    state["phase"] = "lobby"
+    save_state()
+    await broadcast({"type": "kicked_all"})
+    return {"status": "lobby", "kicked": kicked_count}
+
+
 @app.get("/api/state")
 async def get_state():
     max_games = state["settings"].get("max_games_per_player", 3)

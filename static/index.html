@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
 
@@ -46,6 +46,7 @@
             <div class="card">
                 <div class="flex justify-between items-center">
                     <h2>Players <span class="text-muted text-sm" id="playerCountLobby">(0)</span></h2>
+                    <button class="btn btn-accent btn-sm" onclick="kickAllPlayers()">Kick All</button>
                 </div>
                 <div class="player-list" id="playerList"></div>
                 <div class="empty-state" id="noPlayersMsg">Waiting for students to join...</div>
@@ -135,7 +136,10 @@
 <!-- Designing Screen (professor) — waiting for lock-ins -->
 <div class="screen" id="screen-prof-designing">
     <div class="card">
-        <h2>Waiting for Agent Lock-ins &amp; Ready</h2>
+        <div class="flex justify-between items-center">
+            <h2>Waiting for Agent Lock-ins &amp; Ready</h2>
+            <button class="btn btn-accent btn-sm" onclick="kickAllPlayers()">Kick All</button>
+        </div>
         <div class="progress-text" id="lockInProgress">Agents locked in: 0 / 0</div>
         <div class="progress-bar"><div class="fill" id="lockInBar" style="width:0%"></div></div>
         <div class="progress-text mt-12" id="profReadyProgress">Ready to start: 0 / 0</div>
@@ -479,6 +483,19 @@ function handleWSMessage(msg) {
                 if (el) el.value = v;
             }
             break;
+        case 'kicked_all':
+            if (APP.isStudent) {
+                // Wipe local identity and bounce back to join screen
+                APP.playerId = null;
+                APP.playerName = null;
+                try { localStorage.removeItem('beer_player_id'); } catch (e) {}
+                try { localStorage.removeItem('beer_player_name'); } catch (e) {}
+                alert('The professor has reset the session. Please rejoin.');
+                showScreen('screen-join');
+            } else {
+                fetchState().then(s => { initLobbyFromState(s); showScreen('screen-lobby'); });
+            }
+            break;
     }
 }
 
@@ -784,6 +801,14 @@ function renderFinalResults(teams) {
 
 async function restartGame() { await api('/api/restart', {}); }
 async function newGame() { await api('/api/new-game', {}); }
+async function kickAllPlayers() {
+    const count = document.querySelectorAll('#playerList .player-item').length;
+    const msg = count > 0
+        ? `Really kick all ${count} player(s)? They will have to rejoin from scratch.`
+        : 'Really reset the session? (No players currently connected.)';
+    if (!confirm(msg)) return;
+    await api('/api/kick-all', {});
+}
 
 // ── Student: Join ──────────────────────────────────────
 async function joinGame() {
