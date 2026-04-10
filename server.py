@@ -687,6 +687,7 @@ async def join_game(body: dict):
         "strategies": {},
         "custom_prompts": {},
         "locked_in": False,
+        "ready_to_start": False,
         "games_played": 0,
     }
     save_state()
@@ -754,11 +755,40 @@ async def lock_in(body: dict):
         "total_count": total,
     })
 
-    # Auto-begin when all players are locked in (self-service mode).
-    if locked >= total and total > 0:
+    return {"locked": locked, "total": total}
+
+
+@app.post("/api/ready")
+async def player_ready(body: dict):
+    """Each locked-in player presses Ready. Game begins when ALL players are ready."""
+    player_id = body.get("player_id")
+    if not player_id or player_id not in state["players"]:
+        return JSONResponse({"error": "Invalid player"}, status_code=400)
+    if state["phase"] != "designing":
+        return JSONResponse({"error": "Not in design phase"}, status_code=400)
+
+    player = state["players"][player_id]
+    if not player.get("locked_in"):
+        return JSONResponse({"error": "Must lock in strategies first"}, status_code=400)
+
+    player["ready_to_start"] = True
+    save_state()
+
+    total = len(state["players"])
+    ready = sum(1 for p in state["players"].values() if p.get("ready_to_start"))
+
+    await broadcast({
+        "type": "player_ready",
+        "player_id": player_id,
+        "ready_count": ready,
+        "total_count": total,
+    })
+
+    # Begin when every player has pressed Ready.
+    if ready >= total and total > 0:
         await _begin_game_internal()
 
-    return {"locked": locked, "total": total}
+    return {"ready": ready, "total": total}
 
 
 async def _begin_game_internal():
@@ -794,6 +824,7 @@ async def restart_game():
     state["rounds_data"] = {}
     for p in state["players"].values():
         p["locked_in"] = False
+        p["ready_to_start"] = False
         p["strategies"] = {}
         p["custom_prompts"] = {}
 
@@ -822,6 +853,7 @@ async def new_game():
         p["strategies"] = {}
         p["custom_prompts"] = {}
         p["locked_in"] = False
+        p["ready_to_start"] = False
     save_state()
     await broadcast({"type": "new_game", "player_count": len(state["players"])})
     return {"status": "lobby"}
@@ -834,6 +866,7 @@ async def get_state():
         "name": p["name"],
         "roles": p["roles"],
         "locked_in": p["locked_in"],
+        "ready_to_start": p.get("ready_to_start", False),
         "strategies": p["strategies"],
         "games_played": p.get("games_played", 0),
         "games_remaining": max(0, max_games - p.get("games_played", 0)),

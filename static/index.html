@@ -135,11 +135,12 @@
 <!-- Designing Screen (professor) — waiting for lock-ins -->
 <div class="screen" id="screen-prof-designing">
     <div class="card">
-        <h2>Waiting for Agent Lock-ins</h2>
+        <h2>Waiting for Agent Lock-ins &amp; Ready</h2>
         <div class="progress-text" id="lockInProgress">Agents locked in: 0 / 0</div>
         <div class="progress-bar"><div class="fill" id="lockInBar" style="width:0%"></div></div>
+        <div class="progress-text mt-12" id="profReadyProgress">Ready to start: 0 / 0</div>
         <div class="mt-16" id="teamsOverview"></div>
-        <button class="btn btn-green btn-lg mt-20" id="beginBtn" onclick="beginGame()" disabled style="width:100%">Begin Game</button>
+        <button class="btn btn-green btn-lg mt-20" id="beginBtn" onclick="beginGame()" disabled style="width:100%">Begin Game (Professor Override)</button>
     </div>
 </div>
 
@@ -216,9 +217,12 @@
 <div class="screen" id="screen-student-locked">
     <div class="card" style="text-align:center;max-width:500px;margin:60px auto">
         <div style="font-size:48px;margin-bottom:12px">&#9989;</div>
-        <h2>Locked In!</h2>
-        <p class="text-muted mt-8">Waiting for all players to lock in<span class="waiting-dots"></span></p>
+        <h2>Strategies Locked In!</h2>
+        <p class="text-muted mt-8">Press <strong>Ready</strong> when you want the game to start. The game begins once <em>every</em> player is ready.</p>
         <div class="progress-text mt-16" id="lockWaitProgress">0 / 0 locked in</div>
+        <div class="progress-text mt-8" id="readyProgress">0 / 0 ready</div>
+        <button class="btn btn-primary btn-lg mt-20" id="readyBtn" style="width:100%" onclick="pressReady()">I'm Ready &mdash; Start Game</button>
+        <p class="text-muted mt-12" id="readyHint" style="display:none">Waiting for the others<span class="waiting-dots"></span></p>
     </div>
 </div>
 
@@ -443,6 +447,9 @@ function handleWSMessage(msg) {
         case 'player_locked_in':
             updateLockInProgress(msg.locked_count, msg.total_count);
             break;
+        case 'player_ready':
+            updateReadyProgress(msg.ready_count, msg.total_count);
+            break;
         case 'game_begin':
             if (APP.isStudent) showScreen('screen-student-playing');
             else showScreen('screen-prof-playing');
@@ -594,8 +601,17 @@ function handleProfGameStarted(msg) {
 function initDesigningFromState(s) {
     renderTeamsOverview(s.teams);
     const locked = Object.values(s.players).filter(p => p.locked_in).length;
+    const ready = Object.values(s.players).filter(p => p.ready_to_start).length;
     const total = Object.keys(s.players).length;
     updateLockInProgress(locked, total);
+    updateReadyProgress(ready, total);
+    // If this student already pressed Ready, hide the button
+    if (APP.isStudent && APP.playerId && s.players[APP.playerId] && s.players[APP.playerId].ready_to_start) {
+        const btn = document.getElementById('readyBtn');
+        const hint = document.getElementById('readyHint');
+        if (btn) btn.style.display = 'none';
+        if (hint) hint.style.display = '';
+    }
 }
 
 function renderTeamsOverview(teams) {
@@ -623,6 +639,28 @@ function updateLockInProgress(locked, total) {
 
     const lw = document.getElementById('lockWaitProgress');
     if (lw) lw.textContent = `${locked} / ${total} locked in`;
+}
+
+function updateReadyProgress(ready, total) {
+    const rp = document.getElementById('readyProgress');
+    if (rp) rp.textContent = `${ready} / ${total} ready`;
+    const prp = document.getElementById('profReadyProgress');
+    if (prp) prp.textContent = `Ready to start: ${ready} / ${total}`;
+}
+
+async function pressReady() {
+    const btn = document.getElementById('readyBtn');
+    const hint = document.getElementById('readyHint');
+    if (btn) btn.disabled = true;
+    const r = await api('/api/ready', { player_id: APP.playerId });
+    if (r.error) {
+        if (btn) btn.disabled = false;
+        alert(r.error);
+        return;
+    }
+    if (btn) { btn.style.display = 'none'; }
+    if (hint) { hint.style.display = ''; }
+    updateReadyProgress(r.ready, r.total);
 }
 
 async function beginGame() {
@@ -801,8 +839,10 @@ function handleReconnect(s) {
 
     if (s.phase === 'lobby') showScreen('screen-student-waiting');
     else if (s.phase === 'designing') {
-        if (player.locked_in) showScreen('screen-student-locked');
-        else { buildStudentDesignScreen(s); showScreen('screen-student-design'); }
+        if (player.locked_in) {
+            showScreen('screen-student-locked');
+            initDesigningFromState(s);
+        } else { buildStudentDesignScreen(s); showScreen('screen-student-design'); }
     }
     else if (s.phase === 'playing') {
         initStudentPlayingFromState(s);
@@ -900,8 +940,14 @@ async function lockIn() {
     }
     const result = await api('/api/lock-in', { player_id: APP.playerId, strategies, custom_prompts });
     if (result.error) { alert(result.error); return; }
+    // Reset Ready button on entry to locked screen
+    const rb = document.getElementById('readyBtn');
+    const rh = document.getElementById('readyHint');
+    if (rb) { rb.style.display = ''; rb.disabled = false; }
+    if (rh) { rh.style.display = 'none'; }
     showScreen('screen-student-locked');
     updateLockInProgress(result.locked, result.total);
+    updateReadyProgress(0, result.total);
 }
 
 // ── Student: Playing ───────────────────────────────────
