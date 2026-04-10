@@ -57,7 +57,16 @@
                 <div class="settings-grid">
                     <div class="form-group">
                         <label>Rounds</label>
-                        <input type="number" id="set-rounds" value="20" min="5" max="50" onchange="updateSetting('rounds', this.value)">
+                        <input type="number" id="set-rounds" value="10" min="5" max="50" onchange="updateSetting('rounds', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Warmup Rounds</label>
+                        <input type="number" id="set-warmup_rounds" value="3" min="0" max="10" onchange="updateSetting('warmup_rounds', this.value)">
+                        <div class="hint">First N rounds do not count toward the score.</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Max Games per Student</label>
+                        <input type="number" id="set-max_games_per_player" value="3" min="1" max="20" onchange="updateSetting('max_games_per_player', this.value)">
                     </div>
                     <div class="form-group">
                         <label>Lead Time (weeks)</label>
@@ -108,7 +117,7 @@
                     <div class="settings-grid">
                         <div class="form-group">
                             <label>Mean Demand</label>
-                            <input type="number" id="set-step_demand_before" value="4" min="0" onchange="updateSetting('step_demand_before', this.value)">
+                            <input type="number" id="set-variance_mean" value="4" min="0" onchange="updateSetting('step_demand_before', this.value)">
                         </div>
                         <div class="form-group">
                             <label>Std. Deviation</label>
@@ -274,8 +283,36 @@
         </div>
     </div>
     <div class="chart-container mt-16">
-        <h3>Cumulative Cost</h3>
+        <h3>Your Cumulative Cost</h3>
         <canvas id="chartCost" class="chart-canvas" style="height:160px"></canvas>
+    </div>
+
+    <div class="charts-row mt-16">
+        <div class="chart-container">
+            <h3>Team Cumulative Costs (per role)</h3>
+            <canvas id="chartTeamRoles" class="chart-canvas"></canvas>
+            <div class="chart-legend">
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#FF7043"></div> Retailer</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#66BB6A"></div> Wholesaler</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#42A5F5"></div> Distributor</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#AB47BC"></div> Manufacturer</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <h3>Team Total Cumulative Cost</h3>
+            <canvas id="chartTeamTotal" class="chart-canvas"></canvas>
+            <div class="chart-legend">
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E67E22"></div> Your Team (all 4 roles)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-container mt-16">
+        <h3>Bullwhip Effect per Stage</h3>
+        <p class="text-muted" style="font-size:12px;margin-bottom:8px">
+            Bullwhip = Var(Orders) / Var(Demand) &nbsp;&mdash;&nbsp; values &gt; 1 mean the stage amplifies demand variability.
+        </p>
+        <canvas id="chartBullwhip" class="chart-canvas" style="height:180px"></canvas>
     </div>
 
     <!-- Team costs -->
@@ -499,7 +536,7 @@ function updatePlayerList(players, count) {
 // ── Settings ───────────────────────────────────────────
 async function updateSetting(key, value) {
     const v = ['rounds','lead_time','initial_inventory','initial_pipeline','step_demand_before',
-               'step_demand_after','step_round'].includes(key) ? parseInt(value) :
+               'step_demand_after','step_round','warmup_rounds','max_games_per_player'].includes(key) ? parseInt(value) :
               ['holding_cost','backlog_cost','demand_std'].includes(key) ? parseFloat(value) : value;
     await api('/api/settings', { [key]: v });
 }
@@ -1221,6 +1258,99 @@ function renderCharts(roleData, role, totalRounds) {
     drawLineChart('chartCost', [
         { data: rounds.map(r => r.cumulative_cost), color: '#E74C3C', fill: true },
     ], totalRounds);
+
+    // Team charts (all 4 roles)
+    const ROLE_COLORS = { Retailer: '#FF7043', Wholesaler: '#66BB6A', Distributor: '#42A5F5', Manufacturer: '#AB47BC' };
+    const teamRoleDatasets = Object.keys(ROLE_COLORS).map(rn => ({
+        data: (roleData[rn] || []).map(r => r.cumulative_cost),
+        color: ROLE_COLORS[rn],
+        fill: false,
+    }));
+    drawLineChart('chartTeamRoles', teamRoleDatasets, totalRounds);
+
+    // Team total cumulative (sum across roles per round)
+    const nRounds = Math.max(...Object.values(roleData).map(rs => (rs || []).length), 0);
+    const teamTotal = [];
+    for (let i = 0; i < nRounds; i++) {
+        let s = 0;
+        for (const rn of Object.keys(ROLE_COLORS)) {
+            const rs = roleData[rn] || [];
+            if (rs[i]) s += rs[i].cumulative_cost;
+        }
+        teamTotal.push(s);
+    }
+    drawLineChart('chartTeamTotal', [{ data: teamTotal, color: '#E67E22', fill: true }], totalRounds);
+
+    // Bullwhip bar chart
+    drawBullwhipChart('chartBullwhip', roleData);
+}
+
+function variance(arr) {
+    if (!arr || arr.length < 2) return 0;
+    const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return arr.reduce((a, b) => a + (b - m) * (b - m), 0) / arr.length;
+}
+
+function drawBullwhipChart(canvasId, roleData) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+    const pad = { top: 14, right: 20, bottom: 30, left: 44 };
+    const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+    const ROLE_COLORS = { Retailer: '#FF7043', Wholesaler: '#66BB6A', Distributor: '#42A5F5', Manufacturer: '#AB47BC' };
+    const roles = Object.keys(ROLE_COLORS);
+    const values = roles.map(rn => {
+        const rs = roleData[rn] || [];
+        const orders = rs.map(r => r.order);
+        const demands = rs.map(r => r.demand);
+        const vd = variance(demands);
+        return vd > 0 ? variance(orders) / vd : 0;
+    });
+
+    const yMax = Math.max(1.5, ...values.map(v => v * 1.2));
+    ctx.clearRect(0, 0, W, H);
+
+    // y axis
+    ctx.strokeStyle = '#EEE'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const yVal = (yMax * i) / 4;
+        const y = pad.top + ch - (yVal / yMax) * ch;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+        ctx.fillStyle = '#888'; ctx.font = '11px Arial'; ctx.textAlign = 'right';
+        ctx.fillText(yVal.toFixed(1), pad.left - 6, y + 4);
+    }
+    // reference line at 1.0 (no amplification)
+    const yOne = pad.top + ch - (1 / yMax) * ch;
+    ctx.strokeStyle = '#E74C3C'; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(pad.left, yOne); ctx.lineTo(W - pad.right, yOne); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#E74C3C'; ctx.font = '10px Arial'; ctx.textAlign = 'left';
+    ctx.fillText('1.0 (no amplification)', pad.left + 6, yOne - 3);
+
+    // bars
+    const barW = cw / roles.length * 0.55;
+    const slot = cw / roles.length;
+    roles.forEach((rn, i) => {
+        const v = values[i];
+        const x = pad.left + slot * i + (slot - barW) / 2;
+        const h = (v / yMax) * ch;
+        const y = pad.top + ch - h;
+        ctx.fillStyle = ROLE_COLORS[rn];
+        ctx.fillRect(x, y, barW, h);
+        // value label
+        ctx.fillStyle = '#2C3E50'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(v.toFixed(2), x + barW / 2, y - 4);
+        // role label
+        ctx.fillStyle = '#7F8C8D'; ctx.font = '11px Arial';
+        ctx.fillText(rn, x + barW / 2, H - 10);
+    });
 }
 
 function renderStudentRoleData(roleData, round, totalRounds, teamsSummary) {
