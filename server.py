@@ -631,6 +631,20 @@ async def create_session(body: dict):
     if not api_key:
         return JSONResponse({"error": "API key required"}, status_code=400)
 
+    # Guard: refuse to clobber an active session unless explicitly forced.
+    force = bool(body.get("force"))
+    if not force and state.get("session_id") and state.get("phase") not in (None, "setup", "finished"):
+        return JSONResponse(
+            {
+                "error": "active_session",
+                "message": "An active game session already exists.",
+                "phase": state.get("phase"),
+                "player_count": len(state.get("players", {})),
+                "created_at": state.get("created_at"),
+            },
+            status_code=409,
+        )
+
     # Apply settings if provided
     settings_update = body.get("settings", {})
     for k, v in settings_update.items():

@@ -4,9 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
+
+<!-- Cold-start loading overlay -->
+<div id="bootOverlay" class="boot-overlay">
+    <div class="boot-card">
+        <div class="boot-spinner"></div>
+        <h2>Connecting to Server…</h2>
+        <p class="text-muted">The server may take up to a minute to wake up on first visit.</p>
+    </div>
+</div>
 
 <!-- Header -->
 <div class="header">
@@ -363,6 +372,28 @@ const APP = {
 };
 
 // ── Init ───────────────────────────────────────────────
+function hideBootOverlay() {
+    const o = document.getElementById('bootOverlay');
+    if (o) o.classList.add('hidden');
+}
+
+async function fetchStateWithRetry(maxMs = 90000) {
+    const start = Date.now();
+    let attempt = 0;
+    while (Date.now() - start < maxMs) {
+        try {
+            const s = await fetchState();
+            return s;
+        } catch (e) {
+            attempt++;
+            const msg = document.querySelector('#bootOverlay .boot-card p');
+            if (msg) msg.textContent = `Still waking up… (attempt ${attempt})`;
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+    throw new Error('Server not reachable');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(location.search);
     APP.isStudent = params.has('join');
@@ -372,24 +403,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (APP.isStudent) {
         if (APP.playerId && APP.playerName) {
             // Try to reconnect
-            fetchState().then(s => {
+            fetchStateWithRetry().then(s => {
+                hideBootOverlay();
                 if (s.players && s.players[APP.playerId]) {
                     handleReconnect(s);
                 } else {
                     showScreen('screen-join');
                 }
-            }).catch(() => showScreen('screen-join'));
+            }).catch(() => { hideBootOverlay(); showScreen('screen-join'); });
         } else {
+            hideBootOverlay();
             showScreen('screen-join');
         }
     } else {
-        fetchState().then(s => {
+        fetchStateWithRetry().then(s => {
+            hideBootOverlay();
             if (s.phase === 'setup') showScreen('screen-setup');
             else if (s.phase === 'lobby') { initLobbyFromState(s); showScreen('screen-lobby'); }
             else if (s.phase === 'designing') { initDesigningFromState(s); showScreen('screen-prof-designing'); }
             else if (s.phase === 'playing') { initPlayingFromState(s); showScreen('screen-prof-playing'); }
             else if (s.phase === 'finished') { renderFinalResults(s.teams_summary || []); showScreen('screen-prof-results'); }
-        }).catch(() => showScreen('screen-setup'));
+        }).catch(() => { hideBootOverlay(); showScreen('screen-setup'); });
     }
 
     connectWS();
@@ -502,7 +536,18 @@ function handleWSMessage(msg) {
 // ── Professor: Create Session ──────────────────────────
 async function createSession() {
     const key = document.getElementById('apiKeyInput').value.trim();
-    const result = await api('/api/session', { api_key: key });
+    let result = await api('/api/session', { api_key: key });
+    if (result.error === 'active_session') {
+        const phase = result.phase || 'unknown';
+        const players = result.player_count || 0;
+        const ok = confirm(
+            `An active session is already running.\n` +
+            `Phase: ${phase}, players: ${players}.\n\n` +
+            `Creating a new session will WIPE the current one. Continue?`
+        );
+        if (!ok) return;
+        result = await api('/api/session', { api_key: key, force: true });
+    }
     if (result.error) { alert(result.error); return; }
     APP.sessionId = result.session_id;
     initLobby();
@@ -817,9 +862,10 @@ async function newGame() { await api('/api/new-game', {}); }
 async function kickAllPlayers() {
     const count = document.querySelectorAll('#playerList .player-item').length;
     const msg = count > 0
-        ? `Really kick all ${count} player(s)? They will have to rejoin from scratch.`
-        : 'Really reset the session? (No players currently connected.)';
-    if (!confirm(msg)) return;
+        ? `This will kick ALL ${count} player(s) and wipe the session.\n\nType RESET to confirm:`
+        : `This will wipe the session.\n\nType RESET to confirm:`;
+    const answer = prompt(msg);
+    if (answer !== 'RESET') return;
     await api('/api/kick-all', {});
 }
 

@@ -336,6 +336,44 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .fullscreen-btn:hover { background: white; box-shadow: 0 4px 14px rgba(0,0,0,0.2); transform: translateY(-1px); }
 
+@media (max-width: 700px) {
+    .fullscreen-btn { top: 8px; right: 8px; padding: 6px 10px; font-size: 12px; }
+}
+
+/* ── Cold-start boot overlay ───────────────────────────── */
+.boot-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: linear-gradient(135deg, rgba(154,74,12,0.96), rgba(218,140,55,0.96));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s ease;
+}
+.boot-overlay.hidden { opacity: 0; pointer-events: none; }
+.boot-card {
+    background: rgba(255, 253, 250, 0.96);
+    backdrop-filter: blur(16px);
+    padding: 36px 48px;
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    max-width: 420px;
+}
+.boot-card h2 { margin: 12px 0 8px; color: var(--text); }
+.boot-card p { margin: 0; }
+.boot-spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid rgba(154,74,12,0.15);
+    border-top-color: #C8651A;
+    border-radius: 50%;
+    animation: bootspin 0.9s linear infinite;
+    margin: 0 auto 8px;
+}
+@keyframes bootspin { to { transform: rotate(360deg); } }
+
 /* Big, obvious EXIT button when in fullscreen */
 .game-board.fullscreen .fullscreen-btn {
     top: 20px;
