@@ -70,10 +70,9 @@ body::before {
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    background-image: url("/static/paper-bg.svg");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    background-image: url("/static/puzzle-bg.svg");
+    background-size: 140px 140px;
+    background-repeat: repeat;
 }
 
 body > * { position: relative; z-index: 1; }
@@ -83,7 +82,7 @@ body > * { position: relative; z-index: 1; }
 .header {
     background:
         linear-gradient(135deg, rgba(154,74,12,0.96) 0%, rgba(200,101,26,0.96) 50%, rgba(218,140,55,0.96) 100%),
-        url("/static/paper-bg.svg");
+        url("/static/puzzle-bg.svg");
     background-size: cover;
     color: white;
     padding: 16px 36px;
