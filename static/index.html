@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beer Game</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <h1>&#127866; Beer Distribution Game</h1>
+    <span class="status-badge" id="phaseBadge">Setup</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     PROFESSOR SCREENS
+     ════════════════════════════════════════════════════════════ -->
+
+<!-- Setup Screen (professor) -->
+<div class="screen" id="screen-setup">
+    <div class="card" style="max-width:500px;margin:40px auto">
+        <h2>Create a Game Session</h2>
+        <div class="form-group">
+            <label>Anthropic API Key</label>
+            <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+            <div class="hint">Required for AI agents. Set ANTHROPIC_API_KEY env var to pre-fill.</div>
+        </div>
+        <button class="btn btn-primary btn-lg" style="width:100%" onclick="createSession()">Create Session</button>
+    </div>
+</div>
+
+<!-- Lobby Screen (professor) -->
+<div class="screen" id="screen-lobby">
+    <div class="two-col">
+        <div>
+            <div class="card">
+                <h2>Join Link</h2>
+                <div class="join-link-box">
+                    <div class="url" id="joinUrl"></div>
+                    <div class="copy-hint">Share this link with your students</div>
+                </div>
+                <button class="btn btn-outline btn-sm mt-8" onclick="copyJoinLink()">Copy Link</button>
+            </div>
+            <div class="card">
+                <div class="flex justify-between items-center">
+                    <h2>Players <span class="text-muted text-sm" id="playerCountLobby">(0)</span></h2>
+                </div>
+                <div class="player-list" id="playerList"></div>
+                <div class="empty-state" id="noPlayersMsg">Waiting for students to join...</div>
+            </div>
+        </div>
+        <div>
+            <div class="card">
+                <h2>Game Settings</h2>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Rounds</label>
+                        <input type="number" id="set-rounds" value="20" min="5" max="50" onchange="updateSetting('rounds', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Lead Time (weeks)</label>
+                        <input type="number" id="set-lead_time" value="2" min="1" max="5" onchange="updateSetting('lead_time', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Inventory</label>
+                        <input type="number" id="set-initial_inventory" value="12" min="0" onchange="updateSetting('initial_inventory', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Pipeline</label>
+                        <input type="number" id="set-initial_pipeline" value="4" min="0" onchange="updateSetting('initial_pipeline', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Holding Cost (EUR/unit)</label>
+                        <input type="number" id="set-holding_cost" value="0.50" step="0.1" min="0" onchange="updateSetting('holding_cost', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Backlog Cost (EUR/unit)</label>
+                        <input type="number" id="set-backlog_cost" value="1.00" step="0.1" min="0" onchange="updateSetting('backlog_cost', this.value)">
+                    </div>
+                </div>
+                <div class="divider"></div>
+                <div class="form-group">
+                    <label>Demand Pattern</label>
+                    <select id="set-demand_type" onchange="updateDemandType(this.value)">
+                        <option value="step">Step-Up</option>
+                        <option value="step_variance">Variance</option>
+                    </select>
+                </div>
+                <div id="demand-step-opts">
+                    <div class="settings-grid">
+                        <div class="form-group">
+                            <label>Demand before step</label>
+                            <input type="number" id="set-step_demand_before" value="4" min="0" onchange="updateSetting('step_demand_before', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Demand after step</label>
+                            <input type="number" id="set-step_demand_after" value="8" min="0" onchange="updateSetting('step_demand_after', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Step at round</label>
+                            <input type="number" id="set-step_round" value="5" min="2" onchange="updateSetting('step_round', this.value)">
+                        </div>
+                    </div>
+                </div>
+                <div id="demand-variance-opts" style="display:none">
+                    <div class="settings-grid">
+                        <div class="form-group">
+                            <label>Mean Demand</label>
+                            <input type="number" id="set-step_demand_before" value="4" min="0" onchange="updateSetting('step_demand_before', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Std. Deviation</label>
+                            <input type="number" id="set-demand_std" value="2" min="0" step="0.5" onchange="updateSetting('demand_std', this.value)">
+                            <div class="hint">Random noise around mean demand each round.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-accent btn-lg" style="width:100%" onclick="startGame()">Start Game</button>
+        </div>
+    </div>
+</div>
+
+<!-- Designing Screen (professor) — waiting for lock-ins -->
+<div class="screen" id="screen-prof-designing">
+    <div class="card">
+        <h2>Waiting for Agent Lock-ins</h2>
+        <div class="progress-text" id="lockInProgress">Agents locked in: 0 / 0</div>
+        <div class="progress-bar"><div class="fill" id="lockInBar" style="width:0%"></div></div>
+        <div class="mt-16" id="teamsOverview"></div>
+        <button class="btn btn-green btn-lg mt-20" id="beginBtn" onclick="beginGame()" disabled style="width:100%">Begin Game</button>
+    </div>
+</div>
+
+<!-- Playing Screen (professor) — leaderboard -->
+<div class="screen" id="screen-prof-playing">
+    <div class="card">
+        <div class="flex justify-between items-center mb-12">
+            <h2>Leaderboard</h2>
+            <div>
+                <span class="progress-text" id="roundProgress">Round 0 / 20</span>
+            </div>
+        </div>
+        <div class="progress-bar"><div class="fill" id="roundBar" style="width:0%"></div></div>
+        <div id="leaderboard" class="mt-16"></div>
+    </div>
+</div>
+
+<!-- Results Screen (professor) -->
+<div class="screen" id="screen-prof-results">
+    <div class="card">
+        <h2>Final Results</h2>
+        <div id="finalLeaderboard" class="mt-12"></div>
+    </div>
+    <div class="flex gap-16 mt-20">
+        <button class="btn btn-primary" onclick="restartGame()">Restart (Same Teams)</button>
+        <button class="btn btn-outline" onclick="newGame()">New Game (Reshuffle)</button>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     STUDENT SCREENS
+     ════════════════════════════════════════════════════════════ -->
+
+<!-- Join Screen (student) -->
+<div class="screen" id="screen-join">
+    <div class="card" style="max-width:400px;margin:60px auto;text-align:center">
+        <h2>Join the Beer Game</h2>
+        <p class="text-muted mb-20">Enter your name to join the session.</p>
+        <div class="form-group">
+            <input type="text" id="playerNameInput" placeholder="Your name" style="text-align:center;font-size:18px" onkeydown="if(event.key==='Enter')joinGame()">
+        </div>
+        <button class="btn btn-primary btn-lg" style="width:100%" onclick="joinGame()">Join</button>
+        <div id="joinPlayerCount" class="text-muted mt-12"></div>
+    </div>
+</div>
+
+<!-- Student Waiting -->
+<div class="screen" id="screen-student-waiting">
+    <div class="card" style="max-width:500px;margin:60px auto;text-align:center">
+        <div class="counter" id="waitingPlayerCount">0</div>
+        <p style="font-size:18px;margin-top:8px">players joined</p>
+        <p class="text-muted mt-12 pulse">Waiting for the professor to start<span class="waiting-dots"></span></p>
+        <p class="mt-16" style="font-size:16px">Welcome, <strong id="welcomeName"></strong>!</p>
+    </div>
+</div>
+
+<!-- Agent Design (student) -->
+<div class="screen" id="screen-student-design">
+    <div class="card">
+        <div id="studentTeamInfo"></div>
+        <div class="divider"></div>
+        <div id="strategyPickers"></div>
+        <button class="btn btn-green btn-lg mt-20" style="width:100%" onclick="lockIn()" id="lockInBtn">Lock In</button>
+    </div>
+</div>
+
+<!-- Student Locked -->
+<div class="screen" id="screen-student-locked">
+    <div class="card" style="text-align:center;max-width:500px;margin:60px auto">
+        <div style="font-size:48px;margin-bottom:12px">&#9989;</div>
+        <h2>Locked In!</h2>
+        <p class="text-muted mt-8">Waiting for all players to lock in<span class="waiting-dots"></span></p>
+        <div class="progress-text mt-16" id="lockWaitProgress">0 / 0 locked in</div>
+    </div>
+</div>
+
+<!-- Student Playing -->
+<div class="screen" id="screen-student-playing">
+    <!-- Role tabs for dual-role players -->
+    <div class="tabs" id="roleTabs" style="display:none"></div>
+
+    <!-- Game Board — 16:9 SVG canvas -->
+    <div class="game-board" id="gameBoard">
+        <button class="fullscreen-btn" onclick="toggleFullscreen()">&#x26F6; Fullscreen</button>
+        <svg id="gameSvg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <!-- Round progress -->
+    <div class="card mt-16">
+        <div class="flex justify-between items-center">
+            <h2 id="studentRoleTitle">Your Role</h2>
+            <span class="progress-text" id="studentRoundProgress">Round 0 / 20</span>
+        </div>
+        <div class="progress-bar"><div class="fill" id="studentRoundBar" style="width:0%"></div></div>
+    </div>
+
+    <!-- Round history table -->
+    <div class="card mt-16">
+        <h2>Round History</h2>
+        <div style="overflow-x:auto;max-height:300px">
+            <table class="data-table" id="roundTable">
+                <thead>
+                    <tr>
+                        <th>Wk</th>
+                        <th>Demand</th>
+                        <th>Stock</th>
+                        <th>Backlog</th>
+                        <th>Pipeline</th>
+                        <th>Order</th>
+                        <th>Cost</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="roundTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row mt-16">
+        <div class="chart-container">
+            <h3>Orders vs Demand</h3>
+            <canvas id="chartOrdersDemand" class="chart-canvas"></canvas>
+            <div class="chart-legend">
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E67E22"></div> Your Orders</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#7F8C8D"></div> Demand</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <h3>Inventory & Backlog</h3>
+            <canvas id="chartInventory" class="chart-canvas"></canvas>
+            <div class="chart-legend">
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#27AE60"></div> Inventory</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E74C3C"></div> Backlog</div>
+            </div>
+        </div>
+    </div>
+    <div class="chart-container mt-16">
+        <h3>Cumulative Cost</h3>
+        <canvas id="chartCost" class="chart-canvas" style="height:160px"></canvas>
+    </div>
+
+    <!-- Team costs -->
+    <div class="card mt-16">
+        <h2>Team Overview</h2>
+        <div id="teamCostsOverview"></div>
+    </div>
+</div>
+
+<!-- Student Results -->
+<div class="screen" id="screen-student-results">
+    <div class="card" style="text-align:center">
+        <h2>Game Over!</h2>
+        <div id="studentFinalRank" class="mt-12"></div>
+    </div>
+    <div class="card mt-16">
+        <h2>Class Leaderboard</h2>
+        <div id="studentLeaderboard"></div>
+    </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+const APP = {
+    isStudent: false,
+    playerId: null,
+    playerName: '',
+    sessionId: null,
+    ws: null,
+    roles: [],
+    activeRole: null,
+    teamId: null,
+};
+
+// ── Init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(location.search);
+    APP.isStudent = params.has('join');
+    APP.playerId = localStorage.getItem('beer_player_id');
+    APP.playerName = localStorage.getItem('beer_player_name');
+
+    if (APP.isStudent) {
+        if (APP.playerId && APP.playerName) {
+            // Try to reconnect
+            fetchState().then(s => {
+                if (s.players && s.players[APP.playerId]) {
+                    handleReconnect(s);
+                } else {
+                    showScreen('screen-join');
+                }
+            }).catch(() => showScreen('screen-join'));
+        } else {
+            showScreen('screen-join');
+        }
+    } else {
+        fetchState().then(s => {
+            if (s.phase === 'setup') showScreen('screen-setup');
+            else if (s.phase === 'lobby') { initLobbyFromState(s); showScreen('screen-lobby'); }
+            else if (s.phase === 'designing') { initDesigningFromState(s); showScreen('screen-prof-designing'); }
+            else if (s.phase === 'playing') { initPlayingFromState(s); showScreen('screen-prof-playing'); }
+            else if (s.phase === 'finished') { renderFinalResults(s.teams_summary || []); showScreen('screen-prof-results'); }
+        }).catch(() => showScreen('screen-setup'));
+    }
+
+    connectWS();
+});
+
+// ── Screens ────────────────────────────────────────────
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+
+    // Update phase badge
+    const badge = document.getElementById('phaseBadge');
+    const map = {
+        'screen-setup': 'Setup', 'screen-lobby': 'Lobby',
+        'screen-prof-designing': 'Agent Design', 'screen-prof-playing': 'Playing',
+        'screen-prof-results': 'Results', 'screen-join': 'Join',
+        'screen-student-waiting': 'Waiting', 'screen-student-design': 'Agent Design',
+        'screen-student-locked': 'Locked In', 'screen-student-playing': 'Playing',
+        'screen-student-results': 'Results',
+    };
+    badge.textContent = map[id] || '';
+}
+
+// ── API helpers ────────────────────────────────────────
+async function api(path, body) {
+    const resp = await fetch(path, {
+        method: body ? 'POST' : 'GET',
+        headers: body ? {'Content-Type': 'application/json'} : {},
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    return resp.json();
+}
+
+async function fetchState() {
+    return api('/api/state');
+}
+
+// ── WebSocket ──────────────────────────────────────────
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    APP.ws = new WebSocket(`${proto}://${location.host}/ws`);
+    APP.ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        handleWSMessage(msg);
+    };
+    APP.ws.onclose = () => setTimeout(connectWS, 2000);
+}
+
+function handleWSMessage(msg) {
+    switch(msg.type) {
+        case 'player_joined':
+            updatePlayerList(msg.players, msg.player_count);
+            break;
+        case 'game_started':
+            if (APP.isStudent) handleStudentGameStarted(msg);
+            else handleProfGameStarted(msg);
+            break;
+        case 'player_locked_in':
+            updateLockInProgress(msg.locked_count, msg.total_count);
+            break;
+        case 'game_begin':
+            if (APP.isStudent) showScreen('screen-student-playing');
+            else showScreen('screen-prof-playing');
+            break;
+        case 'round_complete':
+            handleRoundComplete(msg);
+            break;
+        case 'game_finished':
+            handleGameFinished(msg);
+            break;
+        case 'game_restarted':
+            if (APP.isStudent) handleStudentGameStarted({teams: msg.teams});
+            else handleProfGameStarted({teams: msg.teams});
+            break;
+        case 'new_game':
+            if (APP.isStudent) {
+                showScreen('screen-student-waiting');
+                document.getElementById('waitingPlayerCount').textContent = msg.player_count;
+            } else {
+                fetchState().then(s => { initLobbyFromState(s); showScreen('screen-lobby'); });
+            }
+            break;
+        case 'settings_updated':
+            // Update settings inputs
+            for (const [k, v] of Object.entries(msg.settings)) {
+                const el = document.getElementById(`set-${k}`);
+                if (el) el.value = v;
+            }
+            break;
+    }
+}
+
+// ── Professor: Create Session ──────────────────────────
+async function createSession() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    const result = await api('/api/session', { api_key: key });
+    if (result.error) { alert(result.error); return; }
+    APP.sessionId = result.session_id;
+    initLobby();
+    showScreen('screen-lobby');
+}
+
+function initLobby() {
+    const url = `${location.origin}/?join=true`;
+    document.getElementById('joinUrl').textContent = url;
+}
+
+function initLobbyFromState(s) {
+    APP.sessionId = s.session_id;
+    initLobby();
+    // Restore settings
+    for (const [k, v] of Object.entries(s.settings)) {
+        const el = document.getElementById(`set-${k}`);
+        if (el) el.value = v;
+    }
+    updateDemandType(s.settings.demand_type);
+    // Restore players
+    if (s.players) {
+        const players = {};
+        for (const [pid, p] of Object.entries(s.players)) players[pid] = { name: p.name };
+        updatePlayerList(players, Object.keys(players).length);
+    }
+}
+
+function copyJoinLink() {
+    const url = document.getElementById('joinUrl').textContent;
+    navigator.clipboard.writeText(url);
+}
+
+function updatePlayerList(players, count) {
+    const list = document.getElementById('playerList');
+    const countEl = document.getElementById('playerCountLobby');
+    const emptyMsg = document.getElementById('noPlayersMsg');
+    if (countEl) countEl.textContent = `(${count})`;
+    if (emptyMsg) emptyMsg.style.display = count > 0 ? 'none' : 'block';
+
+    if (list) {
+        list.innerHTML = '';
+        for (const [pid, p] of Object.entries(players)) {
+            const chip = document.createElement('div');
+            chip.className = 'player-chip';
+            chip.textContent = p.name;
+            list.appendChild(chip);
+        }
+    }
+
+    // Student waiting screen
+    const wc = document.getElementById('waitingPlayerCount');
+    if (wc) wc.textContent = count;
+    const jc = document.getElementById('joinPlayerCount');
+    if (jc) jc.textContent = `${count} player${count !== 1 ? 's' : ''} joined`;
+}
+
+// ── Settings ───────────────────────────────────────────
+async function updateSetting(key, value) {
+    const v = ['rounds','lead_time','initial_inventory','initial_pipeline','step_demand_before',
+               'step_demand_after','step_round'].includes(key) ? parseInt(value) :
+              ['holding_cost','backlog_cost','demand_std'].includes(key) ? parseFloat(value) : value;
+    await api('/api/settings', { [key]: v });
+}
+
+function updateDemandType(val) {
+    document.getElementById('set-demand_type').value = val;
+    document.getElementById('demand-step-opts').style.display = val === 'step' ? '' : 'none';
+    document.getElementById('demand-variance-opts').style.display = val === 'step_variance' ? '' : 'none';
+    updateSetting('demand_type', val);
+}
+
+// ── Professor: Start / Begin ───────────────────────────
+async function startGame() {
+    const result = await api('/api/start', {});
+    if (result.error) { alert(result.error); return; }
+}
+
+function handleProfGameStarted(msg) {
+    showScreen('screen-prof-designing');
+    renderTeamsOverview(msg.teams);
+    updateLockInProgress(0, countTotalPlayers(msg.teams));
+}
+
+function initDesigningFromState(s) {
+    renderTeamsOverview(s.teams);
+    const locked = Object.values(s.players).filter(p => p.locked_in).length;
+    const total = Object.keys(s.players).length;
+    updateLockInProgress(locked, total);
+}
+
+function renderTeamsOverview(teams) {
+    const container = document.getElementById('teamsOverview');
+    container.innerHTML = teams.map(team => {
+        const members = team.members.map(m =>
+            `<span class="role-badge ${m.roles[0]}">${m.roles.join(', ')}</span> ${m.name}`
+        ).join('<br>');
+        return `<div class="card" style="box-shadow:none;border:1px solid var(--border);padding:16px;margin-bottom:8px">
+            <strong>${team.name}</strong><br><div class="text-sm mt-8">${members}</div>
+        </div>`;
+    }).join('');
+}
+
+function countTotalPlayers(teams) {
+    const ids = new Set();
+    teams.forEach(t => t.members.forEach(m => ids.add(m.id || m)));
+    return ids.size;
+}
+
+function updateLockInProgress(locked, total) {
+    document.getElementById('lockInProgress').textContent = `Agents locked in: ${locked} / ${total}`;
+    document.getElementById('lockInBar').style.width = total > 0 ? `${(locked/total)*100}%` : '0%';
+    document.getElementById('beginBtn').disabled = locked < total;
+
+    const lw = document.getElementById('lockWaitProgress');
+    if (lw) lw.textContent = `${locked} / ${total} locked in`;
+}
+
+async function beginGame() {
+    await api('/api/begin', {});
+}
+
+// ── Professor: Playing ─────────────────────────────────
+function initPlayingFromState(s) {
+    if (s.teams_summary && s.teams_summary.length) {
+        renderLeaderboard(s.teams_summary);
+        updateRoundProgress(s.current_round, s.total_rounds);
+    }
+}
+
+function handleRoundComplete(msg) {
+    if (!APP.isStudent) {
+        renderLeaderboard(msg.teams);
+        updateRoundProgress(msg.round, msg.total_rounds);
+    } else {
+        updateStudentPlaying(msg);
+    }
+}
+
+function updateRoundProgress(round, total) {
+    const el = document.getElementById('roundProgress');
+    if (el) el.textContent = `Round ${round} / ${total}`;
+    const bar = document.getElementById('roundBar');
+    if (bar) bar.style.width = `${(round/total)*100}%`;
+}
+
+function renderLeaderboard(teams) {
+    const container = document.getElementById('leaderboard');
+    container.innerHTML = teams.map((team, i) => {
+        const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
+        const members = team.roles.map(r =>
+            `<span class="role-badge ${r.role}">${r.role}</span> ${r.player_name} (${r.strategy}) — ${r.cost.toFixed(2)} EUR`
+        ).join('<br>');
+        return `<div class="leaderboard-item" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="lb-rank ${rankClass}">${i+1}</div>
+            <div class="lb-info">
+                <div class="team-name">${team.name}</div>
+                <div class="team-members">${team.roles.map(r => r.player_name).join(', ')}</div>
+            </div>
+            <div class="lb-cost">${team.total_cost.toFixed(2)} EUR</div>
+        </div>
+        <div class="lb-details"><div class="text-sm">${members}</div></div>`;
+    }).join('');
+}
+
+// ── Professor: Results ─────────────────────────────────
+function handleGameFinished(msg) {
+    if (!APP.isStudent) {
+        showScreen('screen-prof-results');
+        renderFinalResults(msg.teams);
+    } else {
+        showScreen('screen-student-results');
+        renderStudentResults(msg);
+    }
+}
+
+function renderFinalResults(teams) {
+    const container = document.getElementById('finalLeaderboard');
+    container.innerHTML = teams.map((team, i) => {
+        const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
+        // Cost breakdown per role
+        const maxCost = Math.max(...team.roles.map(r => r.cost), 1);
+        const rolesHtml = team.roles.map(r => {
+            const pct = Math.min((r.cost / maxCost) * 100, 100);
+            return `<div class="bar-row">
+                <div class="bar-label"><span class="role-badge ${r.role}">${r.role}</span></div>
+                <div class="bar-track"><div class="bar-fill medium" style="width:${pct}%">${r.cost.toFixed(2)} EUR</div></div>
+            </div>`;
+        }).join('');
+
+        return `<div class="leaderboard-item" onclick="this.nextElementSibling.classList.toggle('open')">
+            <div class="lb-rank ${rankClass}">${i+1}</div>
+            <div class="lb-info">
+                <div class="team-name">${team.name}</div>
+                <div class="team-members">${team.roles.map(r => r.player_name).join(', ')}</div>
+            </div>
+            <div class="lb-cost">${team.total_cost.toFixed(2)} EUR</div>
+        </div>
+        <div class="lb-details">
+            <div class="bar-chart">${rolesHtml}</div>
+            <div class="team-cost-total mt-12">
+                <span>Total</span><span class="value">${team.total_cost.toFixed(2)} EUR</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function restartGame() { await api('/api/restart', {}); }
+async function newGame() { await api('/api/new-game', {}); }
+
+// ── Student: Join ──────────────────────────────────────
+async function joinGame() {
+    const name = document.getElementById('playerNameInput').value.trim();
+    if (!name) return;
+    const result = await api('/api/join', { name });
+    if (result.error) { alert(result.error); return; }
+    APP.playerId = result.player_id;
+    APP.playerName = name;
+    localStorage.setItem('beer_player_id', APP.playerId);
+    localStorage.setItem('beer_player_name', APP.playerName);
+    document.getElementById('welcomeName').textContent = name;
+    showScreen('screen-student-waiting');
+}
+
+function handleReconnect(s) {
+    const player = s.players[APP.playerId];
+    APP.roles = player.roles || [];
+    APP.activeRole = APP.roles[0] || null;
+    // Find team
+    for (const t of s.teams) {
+        if (t.members.some(m => (m.id || m) === APP.playerId)) {
+            APP.teamId = t.id;
+            break;
+        }
+    }
+
+    document.getElementById('welcomeName').textContent = APP.playerName;
+
+    if (s.phase === 'lobby') showScreen('screen-student-waiting');
+    else if (s.phase === 'designing') {
+        if (player.locked_in) showScreen('screen-student-locked');
+        else { buildStudentDesignScreen(s); showScreen('screen-student-design'); }
+    }
+    else if (s.phase === 'playing') {
+        initStudentPlayingFromState(s);
+        showScreen('screen-student-playing');
+    }
+    else if (s.phase === 'finished') showScreen('screen-student-results');
+}
+
+// ── Student: Game Started ──────────────────────────────
+function handleStudentGameStarted(msg) {
+    // Find this player's team and roles
+    for (const team of msg.teams) {
+        for (const member of team.members) {
+            if ((member.id || member) === APP.playerId) {
+                APP.teamId = team.id;
+                APP.roles = member.roles;
+                APP.activeRole = APP.roles[0];
+                buildDesignScreenFromTeam(team, msg.teams);
+                showScreen('screen-student-design');
+                return;
+            }
+        }
+    }
+}
+
+function buildStudentDesignScreen(s) {
+    for (const team of s.teams) {
+        if (team.members.some(m => (m.id || m) === APP.playerId)) {
+            APP.teamId = team.id;
+            buildDesignScreenFromTeam(team, s.teams);
+            return;
+        }
+    }
+}
+
+function buildDesignScreenFromTeam(team, allTeams) {
+    // Team info
+    const infoDiv = document.getElementById('studentTeamInfo');
+    const teammates = team.members.map(m => {
+        const roles = m.roles || [];
+        return `<span class="role-badge ${roles[0]}">${roles.join(', ')}</span> ${m.name}${m.id === APP.playerId ? ' (you)' : ''}`;
+    }).join('<br>');
+    infoDiv.innerHTML = `<h2>${team.name}</h2><div class="text-sm mt-8">${teammates}</div>`;
+
+    // Strategy pickers
+    const pickers = document.getElementById('strategyPickers');
+    pickers.innerHTML = '';
+    for (const role of APP.roles) {
+        const id = `strat-${role}`;
+        pickers.innerHTML += `
+        <div class="mb-20">
+            <h3><span class="role-badge ${role}">${role}</span> Strategy</h3>
+            <div class="strategy-options" id="${id}">
+                ${strategyOption(role, 'rational', 'Rational', 'Minimize YOUR OWN costs only.')}
+                ${strategyOption(role, 'cooperative', 'Cooperative', 'Minimize TOTAL team costs.')}
+                ${strategyOption(role, 'base_stock', 'Base-Stock', 'Deterministic formula (no AI).')}
+                ${strategyOption(role, 'custom', 'Custom', 'Write your own AI instructions.')}
+            </div>
+            <div id="custom-input-${role}" style="display:none" class="mt-8">
+                <textarea id="custom-prompt-${role}" placeholder="e.g. Be conservative early. After round 5, order the average of last 3 demands plus 2 extra."></textarea>
+            </div>
+        </div>`;
+    }
+
+    // Add click handlers
+    document.querySelectorAll('.strategy-option').forEach(el => {
+        el.addEventListener('click', () => {
+            const role = el.dataset.role;
+            const val = el.dataset.value;
+            document.querySelectorAll(`#strat-${role} .strategy-option`).forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            el.querySelector('input').checked = true;
+            document.getElementById(`custom-input-${role}`).style.display = val === 'custom' ? '' : 'none';
+        });
+    });
+}
+
+function strategyOption(role, value, label, desc) {
+    return `<div class="strategy-option" data-role="${role}" data-value="${value}">
+        <input type="radio" name="strategy-${role}" value="${value}">
+        <div class="strat-info"><h4>${label}</h4><p>${desc}</p></div>
+    </div>`;
+}
+
+async function lockIn() {
+    const strategies = {};
+    const custom_prompts = {};
+    for (const role of APP.roles) {
+        const selected = document.querySelector(`input[name="strategy-${role}"]:checked`);
+        if (!selected) { alert(`Please select a strategy for ${role}`); return; }
+        strategies[role] = selected.value;
+        if (selected.value === 'custom') {
+            custom_prompts[role] = document.getElementById(`custom-prompt-${role}`).value;
+        }
+    }
+    const result = await api('/api/lock-in', { player_id: APP.playerId, strategies, custom_prompts });
+    if (result.error) { alert(result.error); return; }
+    showScreen('screen-student-locked');
+    updateLockInProgress(result.locked, result.total);
+}
+
+// ── Student: Playing ───────────────────────────────────
+function initStudentPlayingFromState(s) {
+    if (s.rounds_data && APP.teamId && s.rounds_data[APP.teamId]) {
+        for (const role of APP.roles) {
+            const rounds = s.rounds_data[APP.teamId][role] || [];
+            // render
+        }
+        renderStudentRoleData(s.rounds_data[APP.teamId], s.current_round, s.total_rounds, s.teams_summary);
+    }
+}
+
+function updateStudentPlaying(msg) {
+    // Find this player's team
+    const team = msg.teams.find(t => t.id === APP.teamId);
+    if (!team) return;
+
+    updateStudentRoundProgress(msg.round, msg.total_rounds);
+
+    // Build round data from team.roles
+    const data = {};
+    for (const r of team.roles) {
+        data[r.role] = r.rounds || [];
+    }
+    renderStudentRoleData(data, msg.round, msg.total_rounds, msg.teams);
+}
+
+function updateStudentRoundProgress(round, total) {
+    document.getElementById('studentRoundProgress').textContent = `Round ${round} / ${total}`;
+    document.getElementById('studentRoundBar').style.width = `${(round/total)*100}%`;
+}
+
+
+// ═══ GAME BOARD — Full SVG simulation ═══
+
+function toggleFullscreen() {
+    const b = document.getElementById('gameBoard');
+    b.classList.toggle('fullscreen');
+    b.querySelector('.fullscreen-btn').textContent = b.classList.contains('fullscreen') ? '✕ Exit' : '⛶ Fullscreen';
+}
+
+// SVG Building generators
+function svgRetailer(x, y) {
+    return `<g transform="translate(${x-50},${y-45})">
+        <rect x="5" y="30" width="90" height="50" rx="3" fill="#FBE9E7" stroke="#E64A19" stroke-width="1.5"/>
+        <rect x="5" y="25" width="90" height="12" rx="2" fill="#FF7043"/>
+        <rect x="0" y="20" width="100" height="8" rx="2" fill="#E64A19"/>
+        <rect x="0" y="14" width="100" height="8" fill="url(#canopy)"/>
+        <rect x="35" y="48" width="30" height="32" rx="2" fill="#5D4037"/>
+        <rect x="12" y="40" width="18" height="14" rx="1" fill="#BBDEFB" stroke="#90CAF9" stroke-width="0.8"/>
+        <rect x="70" y="40" width="18" height="14" rx="1" fill="#BBDEFB" stroke="#90CAF9" stroke-width="0.8"/>
+        <defs><pattern id="canopy" width="10" height="8" patternUnits="userSpaceOnUse">
+            <rect width="5" height="8" fill="#FF7043"/><rect x="5" width="5" height="8" fill="#FFCCBC"/>
+        </pattern></defs>
+    </g>`;
+}
+
+function svgWholesaler(x, y) {
+    return `<g transform="translate(${x-50},${y-40})">
+        <rect x="0" y="20" width="100" height="55" rx="3" fill="#E8F5E9" stroke="#388E3C" stroke-width="1.5"/>
+        <rect x="0" y="15" width="100" height="12" rx="2" fill="#43A047"/>
+        <text x="50" y="24" text-anchor="middle" font-size="7" fill="white" font-weight="bold" font-family="Arial">WAREHOUSE</text>
+        <rect x="8" y="35" width="25" height="30" rx="1" fill="#A5D6A7" stroke="#66BB6A" stroke-width="0.5"/>
+        <rect x="38" y="35" width="25" height="30" rx="1" fill="#A5D6A7" stroke="#66BB6A" stroke-width="0.5"/>
+        <rect x="68" y="35" width="25" height="30" rx="1" fill="#A5D6A7" stroke="#66BB6A" stroke-width="0.5"/>
+        <rect x="10" y="40" width="21" height="3" rx="0.5" fill="#81C784"/>
+        <rect x="10" y="47" width="21" height="3" rx="0.5" fill="#81C784"/>
+        <rect x="40" y="40" width="21" height="3" rx="0.5" fill="#81C784"/>
+        <rect x="40" y="47" width="21" height="3" rx="0.5" fill="#81C784"/>
+        <rect x="70" y="40" width="21" height="3" rx="0.5" fill="#81C784"/>
+        <rect x="70" y="47" width="21" height="3" rx="0.5" fill="#81C784"/>
+    </g>`;
+}
+
+function svgFactory(x, y) {
+    return `<g transform="translate(${x-55},${y-50})">
+        <rect x="0" y="35" width="80" height="50" rx="3" fill="#F3E5F5" stroke="#7B1FA2" stroke-width="1.5"/>
+        <rect x="0" y="30" width="80" height="12" rx="2" fill="#8E24AA"/>
+        <text x="40" y="39" text-anchor="middle" font-size="6" fill="white" font-weight="bold" font-family="Arial">FACTORY</text>
+        <rect x="82" y="10" width="10" height="75" rx="1" fill="#BDBDBD" stroke="#9E9E9E" stroke-width="0.5"/>
+        <rect x="94" y="18" width="10" height="67" rx="1" fill="#BDBDBD" stroke="#9E9E9E" stroke-width="0.5"/>
+        <rect x="106" y="25" width="8" height="60" rx="1" fill="#BDBDBD" stroke="#9E9E9E" stroke-width="0.5"/>
+        <ellipse cx="87" cy="8" rx="7" ry="5" fill="#B0BEC5" opacity="0.6">
+            <animate attributeName="ry" values="5;7;5" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="3s" repeatCount="indefinite"/>
+        </ellipse>
+        <ellipse cx="99" cy="15" rx="7" ry="5" fill="#B0BEC5" opacity="0.5">
+            <animate attributeName="ry" values="5;8;5" dur="4s" repeatCount="indefinite"/>
+        </ellipse>
+        <ellipse cx="110" cy="22" rx="5" ry="4" fill="#B0BEC5" opacity="0.4">
+            <animate attributeName="ry" values="4;6;4" dur="3.5s" repeatCount="indefinite"/>
+        </ellipse>
+        <rect x="8" y="48" width="14" height="14" rx="1" fill="#CE93D8"/>
+        <rect x="28" y="48" width="14" height="14" rx="1" fill="#CE93D8"/>
+        <rect x="48" y="48" width="14" height="14" rx="1" fill="#CE93D8"/>
+        <circle cx="15" cy="55" r="4" fill="#AB47BC" opacity="0.5"/>
+        <circle cx="35" cy="55" r="4" fill="#AB47BC" opacity="0.5"/>
+        <circle cx="55" cy="55" r="4" fill="#AB47BC" opacity="0.5"/>
+    </g>`;
+}
+
+function svgDistributor(x, y) {
+    return `<g transform="translate(${x-50},${y-40})">
+        <rect x="0" y="20" width="100" height="55" rx="3" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+        <polygon points="0,22 50,2 100,22" fill="#1976D2"/>
+        <text x="50" y="34" text-anchor="middle" font-size="6" fill="white" font-weight="bold" font-family="Arial">DISTRIBUTION</text>
+        <rect x="30" y="42" width="40" height="33" rx="2" fill="#90CAF9" stroke="#64B5F6" stroke-width="0.5"/>
+        <rect x="30" y="42" width="40" height="5" fill="#42A5F5" rx="1"/>
+        <rect x="8" y="42" width="16" height="16" rx="1" fill="#BBDEFB" stroke="#90CAF9" stroke-width="0.5"/>
+        <rect x="76" y="42" width="16" height="16" rx="1" fill="#BBDEFB" stroke="#90CAF9" stroke-width="0.5"/>
+    </g>`;
+}
+
+function svgCustomer(x, y) {
+    return `<g transform="translate(${x-15},${y-20})">
+        <circle cx="15" cy="12" r="10" fill="#FFB74D"/>
+        <circle cx="15" cy="8" r="6" fill="#5D4037"/>
+        <rect x="5" y="16" width="20" height="14" rx="5" fill="#FFB74D"/>
+        <text x="15" y="38" text-anchor="middle" font-size="8" fill="#5D4037" font-weight="bold" font-family="Arial">Customer</text>
+    </g>`;
+}
+
+// SVG Truck: small truck with beer crates facing a direction
+function svgTruck(x, y, dir, units, label) {
+    // dir: 'right','left','up','down'
+    let rot = 0;
+    if (dir === 'left') rot = 180;
+    else if (dir === 'up') rot = -90;
+    else if (dir === 'down') rot = 90;
+    const labelText = units > 0 ? `<rect x="-10" y="12" width="28" height="14" rx="5" fill="rgba(0,0,0,0.7)"/>
+        <text x="4" y="22" text-anchor="middle" font-size="7" fill="white" font-weight="bold" font-family="Arial">${units}</text>` : '';
+    return `<g transform="translate(${x},${y}) rotate(${rot})">
+        <rect x="-18" y="-7" width="22" height="14" rx="2" fill="#455A64"/>
+        <rect x="-16" y="-5" width="8" height="4" rx="1" fill="#8D6E63"/>
+        <rect x="-6" y="-5" width="8" height="4" rx="1" fill="#8D6E63"/>
+        <rect x="4" y="-8" width="14" height="16" rx="2" fill="#FFA726"/>
+        <rect x="12" y="-6" width="5" height="12" rx="1" fill="#BBDEFB"/>
+        <circle cx="-10" cy="9" r="3" fill="#333"/>
+        <circle cx="10" cy="9" r="3" fill="#333"/>
+        ${labelText}
+    </g>`;
+}
+
+// Landscape decorations
+function svgDecorations() {
+    let d = '';
+    // Trees
+    const trees = [[70,90],[420,70],[540,280],[130,300],[700,300],[880,90],[350,470],[750,470],[500,450]];
+    trees.forEach(([tx,ty]) => {
+        d += `<g transform="translate(${tx},${ty})"><rect x="-2" y="0" width="4" height="12" fill="#6D4C41"/>
+        <ellipse cx="0" cy="-4" rx="10" ry="12" fill="#66BB6A" opacity="0.7"/>
+        <ellipse cx="0" cy="-8" rx="7" ry="9" fill="#81C784" opacity="0.6"/></g>`;
+    });
+    // Rocks
+    d += `<ellipse cx="300" cy="310" rx="12" ry="7" fill="#9E9E9E" opacity="0.4"/>`;
+    d += `<ellipse cx="650" cy="260" rx="8" ry="5" fill="#BDBDBD" opacity="0.35"/>`;
+    d += `<ellipse cx="480" cy="160" rx="10" ry="6" fill="#9E9E9E" opacity="0.3"/>`;
+    // Small lake
+    d += `<ellipse cx="480" cy="350" rx="40" ry="20" fill="#4FC3F7" opacity="0.25"/>`;
+    d += `<ellipse cx="478" cy="348" rx="30" ry="14" fill="#29B6F6" opacity="0.2"/>`;
+    return d;
+}
+
+// Main render function
+function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
+    const role = APP.activeRole;
+    const svg = document.getElementById('gameSvg');
+    if (!svg) return;
+
+    const myTeam = teamsSummary ? teamsSummary.find(t => t.id === APP.teamId) : null;
+    const playerNames = {};
+    if (myTeam) for (const r of myTeam.roles) playerNames[r.role] = r.player_name;
+
+    const stages = ['Manufacturer', 'Distributor', 'Wholesaler', 'Retailer'];
+    const stageData = {};
+    for (const s of stages) {
+        const rds = roleData[s] || [];
+        stageData[s] = { last: rds[rds.length - 1] || null };
+    }
+
+    // Coordinates
+    const pos = { Retailer:[160,140], Wholesaler:[800,140], Factory:[160,400], Distributor:[800,400], Customer:[160,210] };
+
+    // Road path: Factory → Distributor → Wholesaler → Retailer (no road to Customer)
+    const roadPath = `M ${pos.Factory} L ${pos.Distributor} L ${pos.Wholesaler} L ${pos.Retailer}`;
+
+    // Road segments for truck placement
+    const segments = [
+        { from:'Factory', to:'Distributor', src:'Manufacturer', dir:'right', p1:pos.Factory, p2:pos.Distributor },
+        { from:'Distributor', to:'Wholesaler', src:'Distributor', dir:'up', p1:pos.Distributor, p2:pos.Wholesaler },
+        { from:'Wholesaler', to:'Retailer', src:'Wholesaler', dir:'left', p1:pos.Wholesaler, p2:pos.Retailer },
+    ];
+
+    let content = '';
+
+    // Decorations (background layer)
+    content += svgDecorations();
+
+    // Road
+    content += `<path d="${roadPath}" stroke="#607D8B" stroke-width="32" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    content += `<path d="${roadPath}" stroke="#78909C" stroke-width="28" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    content += `<path d="${roadPath}" stroke="#FFE082" stroke-width="2" fill="none" stroke-dasharray="12 10" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+    // Trucks on each segment
+    segments.forEach((seg, i) => {
+        const isMe = seg.src === role;
+        const d = stageData[seg.src];
+        const pipe = d.last ? d.last.pipeline : 0;
+        const showUnits = isMe ? pipe : 0;
+        // Position truck along segment based on round
+        const t = round > 0 ? ((round * 30 + i * 25) % 80 + 10) / 100 : 0.5;
+        const tx = seg.p1[0] + (seg.p2[0] - seg.p1[0]) * t;
+        const ty = seg.p1[1] + (seg.p2[1] - seg.p1[1]) * t;
+        content += svgTruck(tx, ty, seg.dir, showUnits);
+    });
+
+    // Buildings
+    const buildings = [
+        { role:'Retailer', fn:svgRetailer, pos:pos.Retailer },
+        { role:'Wholesaler', fn:svgWholesaler, pos:pos.Wholesaler },
+        { role:'Manufacturer', fn:svgFactory, pos:pos.Factory },
+        { role:'Distributor', fn:svgDistributor, pos:pos.Distributor },
+    ];
+
+    buildings.forEach(b => {
+        const isMe = b.role === role;
+        const opacity = isMe ? 1 : 0.45;
+        content += `<g opacity="${opacity}">${b.fn(b.pos[0], b.pos[1])}</g>`;
+
+        // Name label
+        const name = playerNames[b.role] || '?';
+        const color = isMe ? getComputedStyle(document.documentElement).getPropertyValue(`--${b.role.toLowerCase()}`) || '#333' : '#666';
+        content += `<text x="${b.pos[0]}" y="${b.pos[1]+58}" text-anchor="middle" font-size="10" fill="${color}" font-weight="bold" font-family="Arial">${b.role}</text>`;
+        content += `<text x="${b.pos[0]}" y="${b.pos[1]+70}" text-anchor="middle" font-size="9" fill="#666" font-family="Arial">${name}</text>`;
+
+        // Info panel for YOUR station
+        if (isMe && stageData[b.role] && stageData[b.role].last) {
+            const dl = stageData[b.role].last;
+            const px = b.pos[0] < 480 ? b.pos[0] + 80 : b.pos[0] - 210;
+            const py = b.pos[1] - 60;
+            content += `<foreignObject x="${px}" y="${py}" width="180" height="170">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="background:white;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.12);font-family:Arial;font-size:11px;color:#2C3E50;border-left:4px solid ${color.trim()}">
+                    <div style="font-weight:700;font-size:12px;margin-bottom:6px">Week ${round} — ${b.role}</div>
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Receipt</span><span style="font-weight:700;color:#4CAF50">${dl.incoming_shipment ?? '-'}</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Demand</span><span style="font-weight:700">${dl.demand}</span></div>
+                    <hr style="border:none;border-top:1px solid #eee;margin:4px 0">
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Stock</span><span style="font-weight:700;color:${dl.inventory===0?'#E74C3C':'#4CAF50'}">${dl.inventory}</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Backlog</span><span style="font-weight:700;color:${dl.backlog>0?'#E74C3C':'#333'}">${dl.backlog}</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Pipeline</span><span style="font-weight:700">${dl.pipeline}</span></div>
+                    <hr style="border:none;border-top:1px solid #eee;margin:4px 0">
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Cost</span><span style="font-weight:700;color:#E74C3C">${dl.cumulative_cost.toFixed(1)} EUR</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Order</span><span style="font-weight:700;color:#E67E22;font-size:14px">${dl.order}</span></div>
+                </div>
+            </foreignObject>`;
+        }
+    });
+
+    // Customer — sits directly next to Retailer (no road)
+    const isRetailer = role === 'Retailer';
+    const custDemand = isRetailer && stageData.Retailer.last ? stageData.Retailer.last.demand : '?';
+    content += `<g opacity="${isRetailer ? 1 : 0.5}">${svgCustomer(pos.Customer[0], pos.Customer[1])}</g>`;
+    if (isRetailer) {
+        content += `<text x="${pos.Customer[0]}" y="${pos.Customer[1]+35}" text-anchor="middle" font-size="9" fill="#F57C00" font-weight="bold" font-family="Arial">Demand: ${custDemand}</text>`;
+    }
+
+    // Week badge
+    content += `<rect x="830" y="10" width="120" height="28" rx="14" fill="rgba(255,255,255,0.85)"/>`;
+    content += `<text x="890" y="29" text-anchor="middle" font-size="11" fill="#333" font-weight="bold" font-family="Arial">Week ${round} / ${totalRounds}</text>`;
+
+    svg.innerHTML = content;
+
+    // Show reasoning speech bubble for 4 seconds
+    if (round > 0 && stageData[role] && stageData[role].last && stageData[role].last.reasoning) {
+        const reasoning = stageData[role].last.reasoning;
+        const short = reasoning.length > 120 ? reasoning.substring(0, 120) + '...' : reasoning;
+        const bubble = document.createElement('div');
+        bubble.className = 'speech-bubble';
+        const myPos = buildings.find(b => b.role === role);
+        if (myPos) {
+            // Position relative to board using percentages
+            const boardEl = document.getElementById('gameBoard');
+            bubble.style.left = (myPos.pos[0] / 960 * 100) + '%';
+            bubble.style.bottom = (100 - myPos.pos[1] / 540 * 100 + 5) + '%';
+            bubble.textContent = short;
+            // Remove old bubbles
+            boardEl.querySelectorAll('.speech-bubble').forEach(b => b.remove());
+            boardEl.appendChild(bubble);
+            setTimeout(() => bubble.remove(), 4000);
+        }
+    }
+}
+
+
+// ═══ CHART DRAWING (pure Canvas, no library) ═══
+
+function drawLineChart(canvasId, datasets, maxRounds) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+    const pad = { top: 10, right: 15, bottom: 25, left: 40 };
+    const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+    // Find y range
+    let yMin = 0, yMax = 1;
+    datasets.forEach(ds => ds.data.forEach(v => { if (v > yMax) yMax = v; if (v < yMin) yMin = v; }));
+    yMax = Math.ceil(yMax * 1.15);
+    if (yMin < 0) yMin = Math.floor(yMin * 1.15);
+
+    const xScale = (i) => pad.left + (i / Math.max(maxRounds - 1, 1)) * cw;
+    const yScale = (v) => pad.top + ch - ((v - yMin) / (yMax - yMin || 1)) * ch;
+
+    // Clear
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = '#EEEEEE';
+    ctx.lineWidth = 1;
+    const ySteps = 4;
+    for (let i = 0; i <= ySteps; i++) {
+        const yVal = yMin + (yMax - yMin) * i / ySteps;
+        const y = yScale(yVal);
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+        ctx.fillStyle = '#AAA'; ctx.font = '10px Arial'; ctx.textAlign = 'right';
+        ctx.fillText(Math.round(yVal), pad.left - 6, y + 3);
+    }
+
+    // X axis labels
+    ctx.fillStyle = '#AAA'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
+    const maxLabels = Math.min(maxRounds, 20);
+    const step = Math.ceil(maxRounds / maxLabels);
+    for (let i = 0; i < maxRounds; i += step) {
+        ctx.fillText(i + 1, xScale(i), H - 4);
+    }
+
+    // Draw each dataset
+    datasets.forEach(ds => {
+        if (ds.data.length < 1) return;
+        ctx.strokeStyle = ds.color;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ds.data.forEach((v, i) => {
+            const x = xScale(i), y = yScale(v);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Fill area if specified
+        if (ds.fill) {
+            ctx.globalAlpha = 0.15;
+            ctx.fillStyle = ds.color;
+            ctx.lineTo(xScale(ds.data.length - 1), yScale(0));
+            ctx.lineTo(xScale(0), yScale(0));
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        // Dots
+        ds.data.forEach((v, i) => {
+            ctx.fillStyle = ds.color;
+            ctx.beginPath(); ctx.arc(xScale(i), yScale(v), 3, 0, Math.PI * 2); ctx.fill();
+        });
+    });
+}
+
+function renderCharts(roleData, role, totalRounds) {
+    const rounds = roleData[role] || [];
+    if (rounds.length === 0) return;
+
+    // Orders vs Demand
+    drawLineChart('chartOrdersDemand', [
+        { data: rounds.map(r => r.order), color: '#E67E22', fill: false },
+        { data: rounds.map(r => r.demand), color: '#95A5A6', fill: false },
+    ], totalRounds);
+
+    // Inventory & Backlog
+    drawLineChart('chartInventory', [
+        { data: rounds.map(r => r.inventory), color: '#27AE60', fill: true },
+        { data: rounds.map(r => -r.backlog), color: '#E74C3C', fill: true },
+    ], totalRounds);
+
+    // Cumulative Cost
+    drawLineChart('chartCost', [
+        { data: rounds.map(r => r.cumulative_cost), color: '#E74C3C', fill: true },
+    ], totalRounds);
+}
+
+function renderStudentRoleData(roleData, round, totalRounds, teamsSummary) {
+    const role = APP.activeRole;
+    if (!role || !roleData[role]) return;
+
+    document.getElementById('studentRoleTitle').innerHTML =
+        `<span class="role-badge ${role}">${role}</span> — ${APP.playerName}`;
+
+    // Role tabs
+    if (APP.roles.length > 1) {
+        const tabsEl = document.getElementById('roleTabs');
+        tabsEl.style.display = 'flex';
+        tabsEl.innerHTML = APP.roles.map(r =>
+            `<div class="tab ${r === APP.activeRole ? 'active' : ''}" onclick="switchRole('${r}')">${r}</div>`
+        ).join('');
+    }
+
+    renderGameBoard(roleData, round, totalRounds, teamsSummary);
+
+    // Charts
+    requestAnimationFrame(() => renderCharts(roleData, role, totalRounds));
+
+    // Update round progress
+    updateStudentRoundProgress(round, totalRounds);
+
+    // Round table
+    const tbody = document.getElementById('roundTableBody');
+    const rounds = roleData[role] || [];
+    tbody.innerHTML = rounds.map(r => `<tr>
+        <td>${r.round}</td>
+        <td>${r.demand}</td>
+        <td>${r.inventory}</td>
+        <td class="${r.backlog > 0 ? 'backlog-cell' : ''}">${r.backlog}</td>
+        <td>${r.pipeline}</td>
+        <td class="order-cell">${r.order}</td>
+        <td class="cost-cell">${r.cost.toFixed(2)}</td>
+        <td><span class="reasoning-toggle" onclick="this.nextElementSibling.classList.toggle('open')">&#129302; AI</span>
+            <div class="reasoning-box">${r.reasoning || ''}</div></td>
+    </tr>`).join('');
+
+    // Team costs
+    const tc = document.getElementById('teamCostsOverview');
+    const myTeam = teamsSummary ? teamsSummary.find(t => t.id === APP.teamId) : null;
+    if (myTeam) {
+        tc.innerHTML = myTeam.roles.map(r =>
+            `<div class="team-cost-row">
+                <span><span class="role-badge ${r.role}">${r.role}</span> ${r.player_name}</span>
+                <span class="cost-cell">${r.cost.toFixed(2)} EUR</span>
+            </div>`
+        ).join('') + `<div class="team-cost-total">
+            <span>Total Team Cost</span><span class="value">${myTeam.total_cost.toFixed(2)} EUR</span>
+        </div>`;
+    }
+}
+
+function switchRole(role) {
+    APP.activeRole = role;
+    fetchState().then(s => {
+        if (s.rounds_data && APP.teamId) {
+            renderStudentRoleData(s.rounds_data[APP.teamId], s.current_round, s.total_rounds, s.teams_summary);
+        }
+    });
+}
+
+// ── Student: Results ───────────────────────────────────
+function renderStudentResults(msg) {
+    const myTeam = msg.teams.find(t => t.id === APP.teamId);
+    const rank = myTeam ? msg.teams.indexOf(myTeam) + 1 : '?';
+    document.getElementById('studentFinalRank').innerHTML = `
+        <div class="counter">#${rank}</div>
+        <p class="mt-8" style="font-size:18px">${myTeam ? myTeam.name : ''} — ${myTeam ? myTeam.total_cost.toFixed(2) : '?'} EUR</p>`;
+
+    // Leaderboard
+    const container = document.getElementById('studentLeaderboard');
+    container.innerHTML = msg.teams.map((team, i) => {
+        const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
+        const isMe = team.id === APP.teamId;
+        return `<div class="leaderboard-item" style="${isMe ? 'background:#EBF5FB' : ''}">
+            <div class="lb-rank ${rankClass}">${i+1}</div>
+            <div class="lb-info">
+                <div class="team-name">${team.name}${isMe ? ' (you)' : ''}</div>
+            </div>
+            <div class="lb-cost">${team.total_cost.toFixed(2)} EUR</div>
+        </div>`;
+    }).join('');
+}
+</script>
+</body>
+</html>

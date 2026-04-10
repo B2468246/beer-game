@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.DS_Store
+.env
+classroom.db
+.vscode/
+.idea/
+static/.Rhistory

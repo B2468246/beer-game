@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- White background visible through gaps -->
+
+  <!-- Body rectangles -->
+  <rect x="4" y="4" width="92" height="92" rx="4" fill="#EF4444"/>
+  <rect x="104" y="4" width="92" height="92" rx="4" fill="#3B82F6"/>
+  <rect x="4" y="104" width="92" height="92" rx="4" fill="#F97316"/>
+  <rect x="104" y="104" width="92" height="92" rx="4" fill="#22C55E"/>
+
+  <!-- Tab circles (extend into gap, same color as piece) -->
+  <!-- Piece 1 (red): tab right + bottom -->
+  <circle cx="96" cy="50" r="11" fill="#EF4444"/>
+  <circle cx="50" cy="96" r="11" fill="#EF4444"/>
+  <!-- Piece 2 (blue): tab right + bottom -->
+  <circle cx="196" cy="50" r="11" fill="#3B82F6"/>
+  <circle cx="150" cy="96" r="11" fill="#3B82F6"/>
+  <!-- Piece 3 (orange): tab right + bottom -->
+  <circle cx="96" cy="150" r="11" fill="#F97316"/>
+  <circle cx="50" cy="196" r="11" fill="#F97316"/>
+  <!-- Piece 4 (green): tab right + bottom -->
+  <circle cx="196" cy="150" r="11" fill="#22C55E"/>
+  <circle cx="150" cy="196" r="11" fill="#22C55E"/>
+
+  <!-- Blank circles (white, cut into piece body) -->
+  <!-- Piece 1 (red): blank left + top -->
+  <circle cx="4" cy="50" r="11" fill="white"/>
+  <circle cx="50" cy="4" r="11" fill="white"/>
+  <!-- Piece 2 (blue): blank left + top -->
+  <circle cx="104" cy="50" r="11" fill="white"/>
+  <circle cx="150" cy="4" r="11" fill="white"/>
+  <!-- Piece 3 (orange): blank left + top -->
+  <circle cx="4" cy="150" r="11" fill="white"/>
+  <circle cx="50" cy="104" r="11" fill="white"/>
+  <!-- Piece 4 (green): blank left + top -->
+  <circle cx="104" cy="150" r="11" fill="white"/>
+  <circle cx="150" cy="104" r="11" fill="white"/>
+</svg>
