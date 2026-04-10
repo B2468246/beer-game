@@ -195,9 +195,10 @@
     <div class="card" style="max-width:500px;margin:60px auto;text-align:center">
         <div class="counter" id="waitingPlayerCount">0</div>
         <p style="font-size:18px;margin-top:8px">players joined</p>
-        <p class="text-muted mt-12 pulse">Waiting for the professor to start<span class="waiting-dots"></span></p>
         <p class="mt-16" style="font-size:16px">Welcome, <strong id="welcomeName"></strong>!</p>
         <p class="mt-8" style="font-size:14px;color:var(--text-light)" id="gamesRemainingInfo"></p>
+        <button class="btn btn-primary btn-lg mt-20" id="studentStartBtn" onclick="studentStartGame()" style="width:100%;display:none">Start Game Now</button>
+        <p class="text-muted mt-12 pulse" id="waitingHint">Waiting for more players<span class="waiting-dots"></span></p>
     </div>
 </div>
 
@@ -327,6 +328,8 @@
     <div class="card" style="text-align:center">
         <h2>Game Over!</h2>
         <div id="studentFinalRank" class="mt-12"></div>
+        <button class="btn btn-primary btn-lg mt-20" id="studentPlayAgainBtn" onclick="studentPlayAgain()" style="display:none">Play Another Game</button>
+        <p class="text-muted mt-8" id="studentPlayAgainHint"></p>
     </div>
     <div class="card mt-16" id="studentPrizesCard" style="display:none">
         <h2>&#127942; Prizes</h2>
@@ -531,6 +534,34 @@ function updatePlayerList(players, count) {
     if (wc) wc.textContent = count;
     const jc = document.getElementById('joinPlayerCount');
     if (jc) jc.textContent = `${count} player${count !== 1 ? 's' : ''} joined`;
+
+    // Show "Start Game Now" button once we have at least 4 players
+    const startBtn = document.getElementById('studentStartBtn');
+    const hint = document.getElementById('waitingHint');
+    if (startBtn && hint && APP.isStudent) {
+        if (count >= 4) {
+            startBtn.style.display = '';
+            hint.textContent = 'Click Start when everyone is ready';
+            hint.classList.remove('pulse');
+        } else {
+            startBtn.style.display = 'none';
+            hint.textContent = `Waiting for ${4 - count} more player${4 - count !== 1 ? 's' : ''}…`;
+            hint.classList.add('pulse');
+        }
+    }
+}
+
+async function studentStartGame() {
+    const r = await api('/api/start', {});
+    if (r.error) { alert(r.error); return; }
+}
+
+async function studentPlayAgain() {
+    // Reset session back to lobby (keeps joined players). The student
+    // will automatically land on the waiting screen via the ws broadcast.
+    const r = await api('/api/new-game', {});
+    if (r.error) { alert(r.error); return; }
+    showScreen('screen-student-waiting');
 }
 
 // ── Settings ───────────────────────────────────────────
@@ -761,6 +792,12 @@ function handleReconnect(s) {
 
     document.getElementById('welcomeName').textContent = APP.playerName;
     updateGamesRemaining(player, s);
+    // Update waiting-screen player count + start button
+    if (s.players) {
+        const plist = {};
+        for (const [pid, p] of Object.entries(s.players)) plist[pid] = { name: p.name };
+        updatePlayerList(plist, Object.keys(plist).length);
+    }
 
     if (s.phase === 'lobby') showScreen('screen-student-waiting');
     else if (s.phase === 'designing') {
@@ -1423,6 +1460,22 @@ function renderStudentResults(msg) {
     document.getElementById('studentFinalRank').innerHTML = `
         <div class="counter">#${rank}</div>
         <p class="mt-8" style="font-size:18px">${myTeam ? myTeam.name : ''} — ${myTeam ? teamScore(myTeam).toFixed(2) : '?'} EUR</p>`;
+
+    // Play-again button: show only if student still has games left
+    fetchState().then(s => {
+        const me = s && s.players && s.players[APP.playerId];
+        const btn = document.getElementById('studentPlayAgainBtn');
+        const hint = document.getElementById('studentPlayAgainHint');
+        if (!btn || !me) return;
+        const remaining = me.games_remaining != null ? me.games_remaining : 0;
+        if (remaining > 0) {
+            btn.style.display = '';
+            if (hint) hint.textContent = `You have ${remaining} game${remaining !== 1 ? 's' : ''} left`;
+        } else {
+            btn.style.display = 'none';
+            if (hint) hint.textContent = 'No games remaining';
+        }
+    }).catch(() => {});
 
     // Leaderboard
     const container = document.getElementById('studentLeaderboard');

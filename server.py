@@ -753,15 +753,18 @@ async def lock_in(body: dict):
         "locked_count": locked,
         "total_count": total,
     })
+
+    # Auto-begin when all players are locked in (self-service mode).
+    if locked >= total and total > 0:
+        await _begin_game_internal()
+
     return {"locked": locked, "total": total}
 
 
-@app.post("/api/begin")
-async def begin_game():
-    """Professor begins the game after all lock-ins."""
+async def _begin_game_internal():
+    """Core begin logic, callable from /api/begin or auto from lock-in."""
     if state["phase"] != "designing":
-        return JSONResponse({"error": "Not in design phase"}, status_code=400)
-
+        return
     state["phase"] = "playing"
     state["demand_sequence"] = generate_demand_sequence(state["settings"])
 
@@ -771,9 +774,15 @@ async def begin_game():
     save_state()
 
     await broadcast({"type": "game_begin", "total_rounds": state["settings"]["rounds"]})
-
-    # Run game in background
     asyncio.create_task(run_game())
+
+
+@app.post("/api/begin")
+async def begin_game():
+    """Professor begins the game after all lock-ins."""
+    if state["phase"] != "designing":
+        return JSONResponse({"error": "Not in design phase"}, status_code=400)
+    await _begin_game_internal()
     return {"status": "running"}
 
 
