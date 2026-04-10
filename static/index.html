@@ -480,6 +480,12 @@ async function api(path, body) {
 }
 
 async function fetchState() {
+    // Students append their player_id so the server only returns
+    // their OWN team's rounds_data (privacy between groups).
+    if (APP.isStudent && APP.playerId) {
+        const resp = await fetch(`/api/state?player_id=${encodeURIComponent(APP.playerId)}`);
+        return resp.json();
+    }
     return api('/api/state');
 }
 

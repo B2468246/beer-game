@@ -920,8 +920,17 @@ async def kick_all_players():
     return {"status": "lobby", "kicked": kicked_count}
 
 
+def _team_id_for_player(player_id: str) -> Optional[str]:
+    if not player_id:
+        return None
+    for team in state.get("teams", []):
+        if player_id in team.get("members", []):
+            return team["id"]
+    return None
+
+
 @app.get("/api/state")
-async def get_state():
+async def get_state(player_id: Optional[str] = None):
     max_games = state["settings"].get("max_games_per_player", 3)
     players_info = {pid: {
         "name": p["name"],
@@ -941,6 +950,16 @@ async def get_state():
         teams_info.append({"id": team["id"], "name": team["name"], "members": members, "role_map": team["role_map"]})
 
     summaries = get_teams_summary() if state["rounds_data"] else []
+
+    # Privacy: students only get rounds_data for THEIR own team. Other teams'
+    # per-round detail (orders, reasoning, inventory) stays server-side. The
+    # professor (no player_id) gets everything.
+    own_team_id = _team_id_for_player(player_id) if player_id else None
+    if player_id:
+        rounds_data_out = {own_team_id: state["rounds_data"].get(own_team_id, {})} if own_team_id else {}
+    else:
+        rounds_data_out = state["rounds_data"]
+
     return {
         "phase": state["phase"],
         "session_id": state["session_id"],
@@ -949,7 +968,7 @@ async def get_state():
         "teams": teams_info,
         "current_round": state["current_round"],
         "total_rounds": state["settings"]["rounds"],
-        "rounds_data": state["rounds_data"],
+        "rounds_data": rounds_data_out,
         "teams_summary": summaries,
         "prizes": compute_prizes(summaries) if state["phase"] == "finished" else None,
     }
