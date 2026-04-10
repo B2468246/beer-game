@@ -27,7 +27,7 @@ state = {
     "session_id": None,
     "api_key": None,
     "settings": {
-        "rounds": 20,
+        "rounds": 10,
         "lead_time": 2,
         "initial_inventory": 12,
         "initial_pipeline": 4,
@@ -360,10 +360,12 @@ async def run_game():
     # Game finished
     state["phase"] = "finished"
     save_state()
+    summaries = get_teams_summary()
     await broadcast({
         "type": "game_finished",
-        "teams": get_teams_summary(),
+        "teams": summaries,
         "bullwhip": compute_bullwhip(team_states),
+        "prizes": compute_prizes(summaries),
     })
 
 
@@ -516,15 +518,20 @@ def compute_bullwhip(team_states: dict) -> dict:
 
 
 def get_teams_summary() -> list[dict]:
-    """Build a summary of all teams for broadcasting."""
+    """Build a summary of all teams. Scoring excludes warmup rounds."""
+    warmup = int(state["settings"].get("warmup_rounds", 0) or 0)
     summaries = []
     for team in state["teams"]:
         roles_info = []
-        total_cost = 0.0
+        total_cost = 0.0          # raw cumulative (all rounds)
+        scored_total = 0.0        # excludes warmup rounds
         for role in ROLES:
             rd_list = state["rounds_data"].get(team["id"], {}).get(role, [])
             cost = rd_list[-1]["cumulative_cost"] if rd_list else 0.0
+            # scored cost = sum of round costs where round > warmup
+            scored_cost = sum(r.get("cost", 0.0) for r in rd_list if r.get("round", 0) > warmup)
             total_cost += cost
+            scored_total += scored_cost
             player_id = team["role_map"][role]
             player = state["players"][player_id]
             strat = player["strategies"].get(role, "rational")
@@ -534,6 +541,7 @@ def get_teams_summary() -> list[dict]:
                 "player_name": player["name"],
                 "strategy": strat,
                 "cost": round(cost, 2),
+                "scored_cost": round(scored_cost, 2),
                 "rounds": rd_list,
             })
         summaries.append({
@@ -541,11 +549,44 @@ def get_teams_summary() -> list[dict]:
             "name": team["name"],
             "members": team["members"],
             "total_cost": round(total_cost, 2),
+            "scored_cost": round(scored_total, 2),
+            "warmup_rounds": warmup,
             "roles": roles_info,
         })
-    # Sort by total cost
-    summaries.sort(key=lambda t: t["total_cost"])
+    # Sort by scored cost (the cost that actually counts)
+    summaries.sort(key=lambda t: t["scored_cost"])
     return summaries
+
+
+def compute_prizes(summaries: list[dict]) -> dict:
+    """Compute winners: best team and best individual player per role."""
+    prizes = {"best_team": None, "best_per_role": {}}
+    if not summaries:
+        return prizes
+    best = summaries[0]
+    prizes["best_team"] = {
+        "team_id": best["id"],
+        "team_name": best["name"],
+        "scored_cost": best["scored_cost"],
+        "player_names": [state["players"][pid]["name"] for pid in best["members"] if pid in state["players"]],
+    }
+    for role in ROLES:
+        best_entry = None
+        for team in summaries:
+            for r in team["roles"]:
+                if r["role"] != role:
+                    continue
+                if best_entry is None or r["scored_cost"] < best_entry["scored_cost"]:
+                    best_entry = {
+                        "role": role,
+                        "player_id": r["player_id"],
+                        "player_name": r["player_name"],
+                        "team_name": team["name"],
+                        "scored_cost": r["scored_cost"],
+                    }
+        if best_entry:
+            prizes["best_per_role"][role] = best_entry
+    return prizes
 
 
 # ── WebSocket broadcasting ────────────────────────────────────────────────────
@@ -796,6 +837,7 @@ async def get_state():
             members.append({"id": pid, "name": p["name"], "roles": p["roles"]})
         teams_info.append({"id": team["id"], "name": team["name"], "members": members, "role_map": team["role_map"]})
 
+    summaries = get_teams_summary() if state["rounds_data"] else []
     return {
         "phase": state["phase"],
         "session_id": state["session_id"],
@@ -805,7 +847,8 @@ async def get_state():
         "current_round": state["current_round"],
         "total_rounds": state["settings"]["rounds"],
         "rounds_data": state["rounds_data"],
-        "teams_summary": get_teams_summary() if state["rounds_data"] else [],
+        "teams_summary": summaries,
+        "prizes": compute_prizes(summaries) if state["phase"] == "finished" else None,
     }
 
 
