@@ -338,6 +338,14 @@ async def run_game():
         state["current_round"] = round_num
         customer_demand = demand_seq[round_num - 1]
 
+        # Tell clients the round is being computed (so they hide stale team
+        # summary charts until the new numbers arrive).
+        await broadcast({
+            "type": "round_processing",
+            "round": round_num,
+            "total_rounds": n_rounds,
+        })
+
         # Process all teams concurrently for this round
         tasks = []
         for team in state["teams"]:
@@ -770,6 +778,31 @@ async def lock_in(body: dict):
     })
 
     return {"locked": locked, "total": total}
+
+
+@app.post("/api/unlock")
+async def unlock(body: dict):
+    """Player wants to go back and edit strategies before the game starts."""
+    player_id = body.get("player_id")
+    if not player_id or player_id not in state["players"]:
+        return JSONResponse({"error": "Invalid player"}, status_code=400)
+    if state["phase"] != "designing":
+        return JSONResponse({"error": "Game already running"}, status_code=400)
+    player = state["players"][player_id]
+    player["locked_in"] = False
+    player["ready_to_start"] = False
+    save_state()
+    total = len(state["players"])
+    locked = sum(1 for p in state["players"].values() if p["locked_in"])
+    ready = sum(1 for p in state["players"].values() if p.get("ready_to_start"))
+    await broadcast({
+        "type": "player_unlocked",
+        "player_id": player_id,
+        "locked_count": locked,
+        "ready_count": ready,
+        "total_count": total,
+    })
+    return {"locked": locked, "ready": ready, "total": total}
 
 
 @app.post("/api/ready")

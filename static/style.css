@@ -374,16 +374,53 @@ textarea { resize: vertical; min-height: 80px; }
 }
 @keyframes bootspin { to { transform: rotate(360deg); } }
 
-/* Big, obvious EXIT button when in fullscreen */
+/* ── Reasoning archive (post-game) ────────────────────── */
+.reasoning-round {
+    border-left: 3px solid var(--primary, #C8651A);
+    padding: 10px 14px 12px;
+    margin-bottom: 14px;
+    background: rgba(255, 250, 240, 0.55);
+    border-radius: 0 10px 10px 0;
+}
+.reasoning-round-head {
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+}
+.reasoning-entry {
+    padding: 8px 0;
+    border-top: 1px dashed rgba(0,0,0,0.08);
+}
+.reasoning-entry:first-of-type { border-top: none; }
+.reasoning-role {
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+.reasoning-text {
+    font-size: 13px;
+    color: var(--text);
+    white-space: pre-wrap;
+    line-height: 1.5;
+    background: rgba(255,255,255,0.6);
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+/* Big, obvious EXIT button when in fullscreen — pushed down so it sits
+   well clear of the browser/macOS top chrome and is easy to spot. */
 .game-board.fullscreen .fullscreen-btn {
-    top: 20px;
-    right: 20px;
-    padding: 12px 22px;
-    font-size: 16px;
+    top: 64px;
+    right: 24px;
+    padding: 14px 26px;
+    font-size: 17px;
     background: linear-gradient(135deg, #E74C3C, #C0392B);
     color: white;
-    border-color: rgba(255,255,255,0.4);
-    box-shadow: 0 4px 16px rgba(231,76,60,0.4);
+    border-color: rgba(255,255,255,0.45);
+    box-shadow: 0 6px 22px rgba(231,76,60,0.5);
+    border-radius: 999px;
+    letter-spacing: 0.3px;
 }
 .game-board.fullscreen .fullscreen-btn:hover {
     background: linear-gradient(135deg, #EC5D4D, #D04535);

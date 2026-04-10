@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=4">
+<link rel="stylesheet" href="/static/style.css?v=5">
 </head>
 <body>
 
@@ -235,6 +235,7 @@
         <div class="progress-text mt-16" id="lockWaitProgress">0 / 0 locked in</div>
         <div class="progress-text mt-8" id="readyProgress">0 / 0 ready</div>
         <button class="btn btn-primary btn-lg mt-20" id="readyBtn" style="width:100%" onclick="pressReady()">I'm Ready &mdash; Start Game</button>
+        <button class="btn btn-outline btn-sm mt-12" style="width:100%" onclick="unlockStrategies()">&larr; Back &mdash; edit my strategies</button>
         <p class="text-muted mt-12" id="readyHint" style="display:none">Waiting for the others<span class="waiting-dots"></span></p>
     </div>
 </div>
@@ -305,38 +306,48 @@
         <canvas id="chartCost" class="chart-canvas" style="height:160px"></canvas>
     </div>
 
-    <div class="charts-row mt-16">
-        <div class="chart-container">
-            <h3>Team Cumulative Costs (per role)</h3>
-            <canvas id="chartTeamRoles" class="chart-canvas"></canvas>
-            <div class="chart-legend">
-                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#FF7043"></div> Retailer</div>
-                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#66BB6A"></div> Wholesaler</div>
-                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#42A5F5"></div> Distributor</div>
-                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#AB47BC"></div> Manufacturer</div>
+    <!-- Team summary section: only visible BETWEEN rounds (after round_complete) -->
+    <div id="teamSummarySection">
+        <div class="charts-row mt-16">
+            <div class="chart-container">
+                <h3>Team Cumulative Costs (per role)</h3>
+                <canvas id="chartTeamRoles" class="chart-canvas"></canvas>
+                <div class="chart-legend">
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#FF7043"></div> Retailer</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#66BB6A"></div> Wholesaler</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#42A5F5"></div> Distributor</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#AB47BC"></div> Manufacturer</div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>Team Total Cumulative Cost</h3>
+                <canvas id="chartTeamTotal" class="chart-canvas"></canvas>
+                <div class="chart-legend">
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E67E22"></div> Your Team (all 4 roles)</div>
+                </div>
             </div>
         </div>
-        <div class="chart-container">
-            <h3>Team Total Cumulative Cost</h3>
-            <canvas id="chartTeamTotal" class="chart-canvas"></canvas>
-            <div class="chart-legend">
-                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E67E22"></div> Your Team (all 4 roles)</div>
-            </div>
+
+        <div class="chart-container mt-16">
+            <h3>Bullwhip Effect per Stage</h3>
+            <p class="text-muted" style="font-size:12px;margin-bottom:8px">
+                Bullwhip = Var(Orders) / Var(Demand) &nbsp;&mdash;&nbsp; values &gt; 1 mean the stage amplifies demand variability.
+            </p>
+            <canvas id="chartBullwhip" class="chart-canvas" style="height:180px"></canvas>
+        </div>
+
+        <!-- Team costs -->
+        <div class="card mt-16">
+            <h2>Team Overview</h2>
+            <div id="teamCostsOverview"></div>
         </div>
     </div>
 
-    <div class="chart-container mt-16">
-        <h3>Bullwhip Effect per Stage</h3>
-        <p class="text-muted" style="font-size:12px;margin-bottom:8px">
-            Bullwhip = Var(Orders) / Var(Demand) &nbsp;&mdash;&nbsp; values &gt; 1 mean the stage amplifies demand variability.
-        </p>
-        <canvas id="chartBullwhip" class="chart-canvas" style="height:180px"></canvas>
-    </div>
-
-    <!-- Team costs -->
-    <div class="card mt-16">
-        <h2>Team Overview</h2>
-        <div id="teamCostsOverview"></div>
+    <!-- Computing-round placeholder (visible while AI processes a round) -->
+    <div class="card mt-16" id="roundProcessingNote" style="display:none;text-align:center">
+        <div class="boot-spinner" style="margin: 0 auto 10px"></div>
+        <h3>Round in progress…</h3>
+        <p class="text-muted">The team summary will reappear once this round finishes.</p>
     </div>
 </div>
 
@@ -355,6 +366,16 @@
     <div class="card mt-16">
         <h2>Class Leaderboard</h2>
         <div id="studentLeaderboard"></div>
+    </div>
+
+    <!-- Collapsible AI reasoning archive -->
+    <div class="card mt-16" id="reasoningArchiveCard">
+        <div class="flex justify-between items-center" style="cursor:pointer" onclick="toggleReasoningArchive()">
+            <h2>&#129504; AI Reasoning Archive</h2>
+            <span id="reasoningArchiveToggle" style="font-size:22px;color:var(--text-muted)">&#9656;</span>
+        </div>
+        <p class="text-muted text-sm mt-8">Click to expand. Shows what each AI agent said in every round.</p>
+        <div id="reasoningArchiveBody" style="display:none" class="mt-12"></div>
     </div>
 </div>
 
@@ -492,8 +513,18 @@ function handleWSMessage(msg) {
             if (APP.isStudent) showScreen('screen-student-playing');
             else showScreen('screen-prof-playing');
             break;
+        case 'round_processing':
+            // Hide team summary while AI computes the next round
+            { const s = document.getElementById('teamSummarySection'); if (s) s.style.display = 'none'; }
+            { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = ''; }
+            break;
         case 'round_complete':
+            { const s = document.getElementById('teamSummarySection'); if (s) s.style.display = ''; }
+            { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = 'none'; }
             handleRoundComplete(msg);
+            break;
+        case 'player_unlocked':
+            // No-op for other clients; the unlocking student already navigates locally.
             break;
         case 'game_finished':
             handleGameFinished(msg);
@@ -710,6 +741,12 @@ function updateReadyProgress(ready, total) {
     if (prp) prp.textContent = `Ready to start: ${ready} / ${total}`;
 }
 
+async function unlockStrategies() {
+    const r = await api('/api/unlock', { player_id: APP.playerId });
+    if (r.error) { alert(r.error); return; }
+    showScreen('screen-student-design');
+}
+
 async function pressReady() {
     const btn = document.getElementById('readyBtn');
     const hint = document.getElementById('readyHint');
@@ -824,7 +861,50 @@ function handleGameFinished(msg) {
         showScreen('screen-student-results');
         renderStudentResults(msg);
         renderPrizes(msg.prizes, 'studentPrizes', 'studentPrizesCard');
+        // Pull full state to populate the reasoning archive (rounds_data)
+        fetchState().then(s => {
+            if (s.rounds_data && APP.teamId && s.rounds_data[APP.teamId]) {
+                renderReasoningArchive(s.rounds_data[APP.teamId]);
+            }
+        }).catch(() => {});
     }
+}
+
+function toggleReasoningArchive() {
+    const body = document.getElementById('reasoningArchiveBody');
+    const arrow = document.getElementById('reasoningArchiveToggle');
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    if (arrow) arrow.innerHTML = open ? '&#9656;' : '&#9662;';
+}
+
+function renderReasoningArchive(roleData) {
+    const body = document.getElementById('reasoningArchiveBody');
+    if (!body) return;
+    const ROLES_ORDER = ['Retailer', 'Wholesaler', 'Distributor', 'Manufacturer'];
+    const roles = ROLES_ORDER.filter(r => roleData[r] && roleData[r].length);
+    if (!roles.length) { body.innerHTML = '<p class="text-muted">No reasoning recorded.</p>'; return; }
+    const maxRound = Math.max(...roles.map(r => roleData[r].length));
+    let html = '';
+    for (let i = 0; i < maxRound; i++) {
+        html += `<div class="reasoning-round"><div class="reasoning-round-head">Round ${i + 1}</div>`;
+        for (const role of roles) {
+            const r = roleData[role][i];
+            if (!r) continue;
+            const reasoning = (r.reasoning || '').toString();
+            html += `<div class="reasoning-entry">
+                <div class="reasoning-role"><span class="role-badge ${role.toLowerCase()}">${role}</span> ordered <strong>${r.order}</strong></div>
+                <div class="reasoning-text">${escapeHtml(reasoning)}</div>
+            </div>`;
+        }
+        html += '</div>';
+    }
+    body.innerHTML = html;
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function renderFinalResults(teams) {
