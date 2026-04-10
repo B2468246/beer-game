@@ -953,7 +953,7 @@ function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
     }
 
     // Coordinates
-    const pos = { Retailer:[160,140], Wholesaler:[800,140], Factory:[160,400], Distributor:[800,400], Customer:[160,210] };
+    const pos = { Retailer:[160,140], Wholesaler:[800,140], Factory:[160,400], Distributor:[800,400], Customer:[160,270] };
 
     // Road path: Factory → Distributor → Wholesaler → Retailer (no road to Customer)
     const roadPath = `M ${pos.Factory} L ${pos.Distributor} L ${pos.Wholesaler} L ${pos.Retailer}`;
