@@ -100,20 +100,22 @@ body.gear-bg-active::before { display: none; }
 .screen { display: none; padding: 28px; max-width: 1200px; margin: 0 auto; }
 .screen.active { display: block; }
 
-/* API-key + student-name screens sit vertically centered in the viewport. */
+/* API-key + student-name screens sit slightly above the vertical middle
+   so the animated gear backdrop stays visible around the login card. */
 #screen-setup.active,
 #screen-join.active {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    display: block;
     min-height: 100vh;
+    padding-top: 32vh;
+    padding-bottom: 15vh;
 }
 #screen-setup .card,
 #screen-join .card {
     width: 100%;
     max-width: 520px;
-    margin: 0 !important;
+    margin: 0 auto !important;
+    position: relative;
+    z-index: 2;
 }
 
 /* ── Cards ──────────────────────────────────────────── */
