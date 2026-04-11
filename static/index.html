@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=9">
+<link rel="stylesheet" href="/static/style.css?v=10">
 </head>
 <body>
 
@@ -226,12 +226,6 @@
         <h2>Connecting to Server…</h2>
         <p class="text-muted">The server may take up to a minute to wake up on first visit.</p>
     </div>
-</div>
-
-<!-- Header -->
-<div class="header">
-    <h1>&#127866; Beer Distribution Game</h1>
-    <span class="status-badge" id="phaseBadge">Setup</span>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -811,18 +805,6 @@ function showScreen(id) {
     const gearScreens = new Set(['screen-setup', 'screen-join']);
     document.body.classList.toggle('gear-bg-active', gearScreens.has(id));
 
-    // Update phase badge
-    const badge = document.getElementById('phaseBadge');
-    const map = {
-        'screen-setup': 'Login', 'screen-prof-sessions': 'Sessions',
-        'screen-prof-overview': 'Overview', 'screen-lobby': 'Lobby',
-        'screen-prof-designing': 'Agent Design', 'screen-prof-playing': 'Playing',
-        'screen-prof-results': 'Results', 'screen-join': 'Join',
-        'screen-student-waiting': 'Waiting', 'screen-student-design': 'Agent Design',
-        'screen-student-locked': 'Locked In', 'screen-student-playing': 'Playing',
-        'screen-student-results': 'Results',
-    };
-    badge.textContent = map[id] || '';
 }
 
 // ── API helpers ────────────────────────────────────────

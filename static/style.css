@@ -94,49 +94,6 @@ body > * { position: relative; z-index: 1; }
 body.gear-bg-active .gear-backdrop { display: block; }
 /* Hide the old puzzle background while the gear scene is active. */
 body.gear-bg-active::before { display: none; }
-/* Header stays visible but slightly translucent so gears peek through. */
-body.gear-bg-active .header {
-    background: linear-gradient(135deg, rgba(154,74,12,0.88) 0%, rgba(200,101,26,0.88) 50%, rgba(218,140,55,0.88) 100%);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-}
-
-/* ── Header ─────────────────────────────────────────── */
-
-.header {
-    background:
-        linear-gradient(135deg, rgba(154,74,12,0.96) 0%, rgba(200,101,26,0.96) 50%, rgba(218,140,55,0.96) 100%),
-        url("/static/puzzle-bg.svg");
-    background-size: cover;
-    color: white;
-    padding: 16px 36px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 6px 24px rgba(60, 30, 5, 0.25), inset 0 -1px 0 rgba(0,0,0,0.15);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-}
-
-.header h1 {
-    font-size: 20px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.header .status-badge {
-    background: rgba(255,255,255,0.2);
-    backdrop-filter: blur(10px);
-    padding: 6px 18px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
 
 /* ── Screens ────────────────────────────────────────── */
 
