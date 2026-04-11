@@ -1355,3 +1355,57 @@ textarea { resize: vertical; min-height: 80px; }
 .game-group-head:hover { background: linear-gradient(90deg, #FFF3DC 0%, #FBEBCE 100%); }
 .game-group-body { padding: 14px 16px 16px; border-top: 1px solid var(--border); }
 
+/* Flat team-summary tables (end-of-game view, one table per role) */
+.team-summary-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border);
+    font-size: 15px;
+}
+.team-summary-total { color: var(--primary-dark); font-weight: 800; }
+.team-role-block {
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #FFFDF9;
+}
+.team-role-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #FAF3E6;
+    border-bottom: 1px solid var(--border);
+}
+.team-role-name { flex: 1; font-weight: 600; color: var(--text); }
+.team-role-cost { color: var(--primary-dark); font-weight: 700; font-variant-numeric: tabular-nums; }
+.team-role-table-wrap { overflow-x: auto; }
+.team-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+.team-summary-table th,
+.team-summary-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #F0E6D2;
+    text-align: left;
+}
+.team-summary-table th {
+    background: #FFF8EC;
+    font-weight: 700;
+    color: var(--text);
+    position: sticky;
+    top: 0;
+}
+.team-summary-table td.num,
+.team-summary-table th { text-align: right; }
+.team-summary-table td:first-child,
+.team-summary-table th:first-child { text-align: left; }
+.team-summary-table tbody tr:hover { background: #FFF8EC; }
+

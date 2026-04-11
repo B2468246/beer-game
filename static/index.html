@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=14">
+<link rel="stylesheet" href="/static/style.css?v=15">
 </head>
 <body>
 
@@ -1894,10 +1894,56 @@ function toggleStudentTeamSummary() {
 function renderStudentTeamSummary(team) {
     const body = document.getElementById('studentTeamSummaryBody');
     if (!body) return;
-    // Reuse the nested round-by-round renderer used by the prof overview,
-    // wrapped in a Game-level collapsible group.
-    const inner = renderOverviewTeamRounds(team);
+    // Render the flat per-role team-summary tables (the same kind shown at
+    // the end of game), wrapped in a Game-level collapsible group. No
+    // round-by-round subdivision — each role is one table with one row per
+    // round so the full trajectory can be traced back at a glance.
+    const inner = renderTeamSummaryTables(team);
     body.innerHTML = renderGameGroup('team', 1, inner);
+}
+
+function renderTeamSummaryTables(team) {
+    const ROLES_ORDER = ['Retailer', 'Wholesaler', 'Distributor', 'Manufacturer'];
+    const roles = ROLES_ORDER
+        .map(r => team.roles.find(x => x.role === r))
+        .filter(r => r && (r.rounds || []).length);
+    if (!roles.length) return '<p class="text-muted">No round data.</p>';
+
+    let html = `<div class="team-summary-head">
+        <strong>${escapeHtml(team.name)}</strong>
+        <span class="team-summary-total">Total ${teamScore(team).toFixed(2)} EUR</span>
+    </div>`;
+
+    for (const r of roles) {
+        const rounds = r.rounds || [];
+        const rows = rounds.map((rd, i) => `
+            <tr>
+                <td class="num">${i + 1}</td>
+                <td class="num">${rd.demand}</td>
+                <td class="num"><strong>${rd.order}</strong></td>
+                <td class="num">${rd.inventory}</td>
+                <td class="num">${rd.backlog}</td>
+                <td class="num">${rd.pipeline}</td>
+                <td class="num">${rd.cost.toFixed(2)}</td>
+            </tr>`).join('');
+        html += `<div class="team-role-block">
+            <div class="team-role-head">
+                <span class="role-badge ${r.role}">${r.role}</span>
+                <span class="team-role-name">${escapeHtml(r.player_name)}</span>
+                <span class="team-role-cost">${roleScore(r).toFixed(2)} EUR</span>
+            </div>
+            <div class="team-role-table-wrap">
+            <table class="team-summary-table">
+                <thead><tr>
+                    <th>Round</th><th>Demand</th><th>Order</th>
+                    <th>Stock</th><th>Backlog</th><th>Pipeline</th><th>Cost</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>
+        </div>`;
+    }
+    return html;
 }
 
 function toggleReasoningArchive() {
