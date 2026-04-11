@@ -100,6 +100,22 @@ body.gear-bg-active::before { display: none; }
 .screen { display: none; padding: 28px; max-width: 1200px; margin: 0 auto; }
 .screen.active { display: block; }
 
+/* API-key + student-name screens sit vertically centered in the viewport. */
+#screen-setup.active,
+#screen-join.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+#screen-setup .card,
+#screen-join .card {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 !important;
+}
+
 /* ── Cards ──────────────────────────────────────────── */
 
 .card {
