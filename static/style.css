@@ -77,6 +77,30 @@ body::before {
 
 body > * { position: relative; z-index: 1; }
 
+/* ── Animated gear backdrop (only on API-key + student name screens) ── */
+.gear-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    display: none;
+    overflow: hidden;
+}
+.gear-backdrop svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+body.gear-bg-active .gear-backdrop { display: block; }
+/* Hide the old puzzle background while the gear scene is active. */
+body.gear-bg-active::before { display: none; }
+/* Header stays visible but slightly translucent so gears peek through. */
+body.gear-bg-active .header {
+    background: linear-gradient(135deg, rgba(154,74,12,0.88) 0%, rgba(200,101,26,0.88) 50%, rgba(218,140,55,0.88) 100%);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
 /* ── Header ─────────────────────────────────────────── */
 
 .header {

@@ -4,9 +4,220 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
+
+<!-- Animated gear backdrop — only shown on screen-setup (prof API key) and screen-join (student name). -->
+<div id="gearBackdrop" class="gear-backdrop" aria-hidden="true">
+<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <pattern id="gbPaper" x="0" y="0" width="38" height="38" patternUnits="userSpaceOnUse">
+            <rect width="38" height="38" fill="#FFF4DA"/>
+            <circle cx="19" cy="19" r="1.2" fill="#EBDDBA"/>
+        </pattern>
+        <g id="gbCloud">
+            <ellipse cx="0"   cy="0" rx="28" ry="18" fill="#FFFFFF" opacity="0.9"/>
+            <ellipse cx="-22" cy="6" rx="22" ry="14" fill="#FFFFFF" opacity="0.85"/>
+            <ellipse cx="24"  cy="6" rx="22" ry="14" fill="#FFFFFF" opacity="0.85"/>
+            <ellipse cx="-4"  cy="-10" rx="20" ry="13" fill="#FFFFFF" opacity="0.9"/>
+        </g>
+        <g id="gbGear">
+            <g fill="currentColor">
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(0)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(30)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(60)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(90)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(120)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(150)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(180)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(210)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(240)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(270)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(300)"/>
+                <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(330)"/>
+            </g>
+            <circle cx="0" cy="0" r="52" fill="currentColor"/>
+            <circle cx="0" cy="0" r="42" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="3"/>
+            <circle cx="0"   cy="-28" r="7" fill="rgba(0,0,0,0.35)"/>
+            <circle cx="24"  cy="14"  r="7" fill="rgba(0,0,0,0.35)"/>
+            <circle cx="-24" cy="14"  r="7" fill="rgba(0,0,0,0.35)"/>
+            <circle cx="0" cy="0" r="14" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
+            <circle cx="0" cy="0" r="4"  fill="rgba(0,0,0,0.55)"/>
+        </g>
+        <g id="gbBalloon">
+            <ellipse cx="0" cy="-40" rx="46" ry="54" fill="#EF5350"/>
+            <path d="M -46 -40 A 46 54 0 0 0 46 -40 L 46 -20 A 46 40 0 0 1 -46 -20 Z" fill="#FFCA28"/>
+            <path d="M -46 -20 A 46 40 0 0 0 46 -20 L 30 8 L -30 8 Z" fill="#42A5F5"/>
+            <line x1="-22" y1="8"  x2="-14" y2="42" stroke="#5D4037" stroke-width="2"/>
+            <line x1="22"  y1="8"  x2="14"  y2="42" stroke="#5D4037" stroke-width="2"/>
+            <rect x="-18" y="42" width="36" height="22" rx="3" fill="#8D6E63" stroke="#4E342E" stroke-width="2"/>
+            <rect x="-18" y="42" width="36" height="5" fill="#4E342E"/>
+        </g>
+        <g id="gbRocket">
+            <path d="M 0 -50 L 14 0 L 14 26 L -14 26 L -14 0 Z" fill="#F5F5F5" stroke="#37474F" stroke-width="2"/>
+            <path d="M 0 -50 L 14 0 L -14 0 Z" fill="#EF5350" stroke="#37474F" stroke-width="2"/>
+            <circle cx="0" cy="-12" r="6" fill="#90CAF9" stroke="#37474F" stroke-width="2"/>
+            <path d="M -14 10 L -26 30 L -14 26 Z" fill="#EF5350" stroke="#37474F" stroke-width="2"/>
+            <path d="M 14 10 L 26 30 L 14 26 Z" fill="#EF5350" stroke="#37474F" stroke-width="2"/>
+            <g>
+                <path d="M -10 26 Q 0 60 10 26 Z" fill="#FFB300">
+                    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.94;0.95;1;1" dur="120s" repeatCount="indefinite"/>
+                </path>
+                <path d="M -6 26 Q 0 48 6 26 Z" fill="#FFEB3B">
+                    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.94;0.95;1;1" dur="120s" repeatCount="indefinite"/>
+                </path>
+            </g>
+        </g>
+        <g id="gbBird">
+            <path d="M -14 0 Q -7 -10 0 0 Q 7 -10 14 0" fill="none" stroke="#37474F" stroke-width="3" stroke-linecap="round"/>
+        </g>
+        <g id="gbSparkle">
+            <path d="M 0 -10 L 2 -2 L 10 0 L 2 2 L 0 10 L -2 2 L -10 0 L -2 -2 Z" fill="#FFD54F"/>
+        </g>
+    </defs>
+
+    <rect width="1600" height="1000" fill="url(#gbPaper)"/>
+
+    <!-- lazy clouds -->
+    <g><animateTransform attributeName="transform" type="translate" from="-120 0" to="1720 0" dur="90s" repeatCount="indefinite"/><use href="#gbCloud" x="0" y="120"/></g>
+    <g><animateTransform attributeName="transform" type="translate" from="-200 0" to="1720 0" dur="130s" repeatCount="indefinite" begin="-40s"/><use href="#gbCloud" x="0" y="200" transform="scale(0.75)"/></g>
+    <g><animateTransform attributeName="transform" type="translate" from="-120 0" to="1720 0" dur="110s" repeatCount="indefinite" begin="-70s"/><use href="#gbCloud" x="0" y="80" transform="scale(1.1)"/></g>
+
+    <!-- 17 gears -->
+    <g transform="translate(210, 330)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="26s" repeatCount="indefinite"/><g transform="scale(2.3)"><use href="#gbGear" style="color:#E91E63"/></g></g></g>
+    <g transform="translate(475, 225)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="17s" repeatCount="indefinite"/><g transform="scale(1.35)"><use href="#gbGear" style="color:#FFB300"/></g></g></g>
+    <g transform="translate(630, 135)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="9s" repeatCount="indefinite"/><g transform="scale(0.82)"><use href="#gbGear" style="color:#43A047"/></g></g></g>
+    <g transform="translate(790, 260)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="15s" repeatCount="indefinite"/><g transform="scale(1.5)"><use href="#gbGear" style="color:#039BE5"/></g></g></g>
+    <g transform="translate(1040, 215)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="22s" repeatCount="indefinite"/><g transform="scale(1.18)"><use href="#gbGear" style="color:#8E24AA"/></g></g></g>
+    <g transform="translate(1230, 125)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="10s" repeatCount="indefinite"/><g transform="scale(0.72)"><use href="#gbGear" style="color:#F4511E"/></g></g></g>
+    <g transform="translate(1395, 340)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="24s" repeatCount="indefinite"/><g transform="scale(1.9)"><use href="#gbGear" style="color:#00ACC1"/></g></g></g>
+    <g transform="translate(150, 680)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="19s" repeatCount="indefinite"/><g transform="scale(1.28)"><use href="#gbGear" style="color:#7CB342"/></g></g></g>
+    <g transform="translate(340, 620)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="8s" repeatCount="indefinite"/><g transform="scale(0.7)"><use href="#gbGear" style="color:#FDD835"/></g></g></g>
+    <g transform="translate(530, 750)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="30s" repeatCount="indefinite"/><g transform="scale(2.0)"><use href="#gbGear" style="color:#3949AB"/></g></g></g>
+    <g transform="translate(760, 660)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="11s" repeatCount="indefinite"/><g transform="scale(0.92)"><use href="#gbGear" style="color:#E53935"/></g></g></g>
+    <g transform="translate(960, 780)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="20s" repeatCount="indefinite"/><g transform="scale(1.42)"><use href="#gbGear" style="color:#00897B"/></g></g></g>
+    <g transform="translate(1165, 700)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="7s" repeatCount="indefinite"/><g transform="scale(0.8)"><use href="#gbGear" style="color:#FB8C00"/></g></g></g>
+    <g transform="translate(1410, 800)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="32s" repeatCount="indefinite"/><g transform="scale(1.75)"><use href="#gbGear" style="color:#6D4C41"/></g></g></g>
+    <g transform="translate(420, 480)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="6s" repeatCount="indefinite"/><g transform="scale(0.55)"><use href="#gbGear" style="color:#D81B60"/></g></g></g>
+    <g transform="translate(1100, 470)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="5.5s" repeatCount="indefinite"/><g transform="scale(0.5)"><use href="#gbGear" style="color:#1E88E5"/></g></g></g>
+    <g transform="translate(660, 430)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="6.5s" repeatCount="indefinite"/><g transform="scale(0.48)"><use href="#gbGear" style="color:#FFEB3B"/></g></g></g>
+
+    <!-- pendulum -->
+    <g transform="translate(90, 480)">
+        <rect x="-8" y="-10" width="16" height="16" rx="2" fill="#4E342E"/>
+        <g>
+            <animateTransform attributeName="transform" type="rotate" values="35 0 0; -35 0 0; 35 0 0" keyTimes="0; 0.5; 1" calcMode="spline" keySplines="0.4 0 0.6 1 ; 0.4 0 0.6 1" dur="2.4s" repeatCount="indefinite"/>
+            <line x1="0" y1="0" x2="0" y2="220" stroke="#6D4C41" stroke-width="5"/>
+            <circle cx="0" cy="230" r="22" fill="#FFB300" stroke="#6D4C41" stroke-width="3"/>
+            <circle cx="0" cy="230" r="6"  fill="#6D4C41"/>
+        </g>
+    </g>
+
+    <!-- pulley + bobbing bucket -->
+    <rect x="770" y="20" width="60" height="14" rx="3" fill="#6D4C41"/>
+    <rect x="760" y="14" width="80" height="10" rx="3" fill="#4E342E"/>
+    <g transform="translate(800, 80)">
+        <g>
+            <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite"/>
+            <circle r="40" fill="#607D8B"/>
+            <circle r="30" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="3"/>
+            <circle r="10" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
+            <circle r="3" fill="#263238"/>
+        </g>
+    </g>
+    <g>
+        <animateTransform attributeName="transform" type="translate" values="0 0 ; 0 26 ; 0 0" dur="6s" repeatCount="indefinite"/>
+        <line x1="770" y1="105" x2="770" y2="525" stroke="#8D6E63" stroke-width="3" stroke-linecap="round"/>
+        <line x1="830" y1="105" x2="830" y2="430" stroke="#8D6E63" stroke-width="3" stroke-linecap="round"/>
+        <g transform="translate(830, 450)">
+            <rect x="-28" y="0" width="56" height="42" rx="3" fill="#FFB74D" stroke="#E65100" stroke-width="2"/>
+            <rect x="-28" y="0" width="56" height="6" fill="#E65100"/>
+            <path d="M -30 2 Q 0 -24 30 2" fill="none" stroke="#E65100" stroke-width="3" stroke-linecap="round"/>
+        </g>
+        <g transform="translate(770, 545)">
+            <circle r="26" fill="#455A64" stroke="#263238" stroke-width="3"/>
+            <text x="0" y="6" text-anchor="middle" font-size="18" font-weight="bold" fill="#ECEFF1" font-family="Arial">1kg</text>
+        </g>
+    </g>
+
+    <!-- chimney with steam -->
+    <g transform="translate(1280, 560)">
+        <rect x="-25" y="0"  width="50" height="110" fill="#C2185B" stroke="#880E4F" stroke-width="2"/>
+        <rect x="-30" y="-8" width="60" height="12"  fill="#880E4F"/>
+        <line x1="-25" y1="30" x2="25" y2="30" stroke="#880E4F" stroke-width="1.5"/>
+        <line x1="-25" y1="60" x2="25" y2="60" stroke="#880E4F" stroke-width="1.5"/>
+        <line x1="-25" y1="90" x2="25" y2="90" stroke="#880E4F" stroke-width="1.5"/>
+        <g><circle cx="0" cy="0" r="18" fill="#ECEFF1"><animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite"/><animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite"/></circle></g>
+        <g><circle cx="0" cy="0" r="18" fill="#ECEFF1"><animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite" begin="-1.3s"/><animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite" begin="-1.3s"/><animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite" begin="-1.3s"/></circle></g>
+        <g><circle cx="0" cy="0" r="18" fill="#ECEFF1"><animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite" begin="-2.6s"/><animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite" begin="-2.6s"/><animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite" begin="-2.6s"/></circle></g>
+    </g>
+
+    <!-- bouncing ball -->
+    <g transform="translate(1100, 880)">
+        <g>
+            <animateTransform attributeName="transform" type="translate" values="0 0 ; 0 -160 ; 0 0" keyTimes="0; 0.5; 1" calcMode="spline" keySplines="0.3 0 0.3 1 ; 0.7 0 0.7 1" dur="1.6s" repeatCount="indefinite"/>
+            <circle r="16" fill="#FF4081" stroke="#AD1457" stroke-width="2"/>
+            <circle cx="-5" cy="-5" r="4" fill="rgba(255,255,255,0.75)"/>
+        </g>
+    </g>
+
+    <!-- bubbles -->
+    <g><circle cx="300" cy="920" r="8" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="11s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="11s" repeatCount="indefinite"/></circle></g>
+    <g><circle cx="720" cy="920" r="10" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="14s" repeatCount="indefinite" begin="-5s"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="14s" repeatCount="indefinite" begin="-5s"/></circle></g>
+    <g><circle cx="1320" cy="920" r="6" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="9s" repeatCount="indefinite" begin="-3s"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="9s" repeatCount="indefinite" begin="-3s"/></circle></g>
+    <g><circle cx="1540" cy="920" r="12" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="16s" repeatCount="indefinite" begin="-8s"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="16s" repeatCount="indefinite" begin="-8s"/></circle></g>
+
+    <!-- flag -->
+    <g transform="translate(60, 200)">
+        <line x1="0" y1="0" x2="0" y2="200" stroke="#4E342E" stroke-width="4"/>
+        <circle cx="0" cy="0" r="5" fill="#FFB300"/>
+        <g>
+            <animateTransform attributeName="transform" type="skewX" values="0; 12; 0; -4; 0" dur="3s" repeatCount="indefinite"/>
+            <path d="M 0 10 L 70 15 L 60 35 L 70 55 L 0 50 Z" fill="#2E7D32" stroke="#1B5E20" stroke-width="2"/>
+            <text x="30" y="38" text-anchor="middle" font-size="18" font-weight="bold" fill="#FFFFFF" font-family="Arial">★</text>
+        </g>
+    </g>
+
+    <!-- 60s event: hot-air balloon -->
+    <g>
+        <animateTransform attributeName="transform" type="translate" values="-120 180 ; -120 180 ; 1720 130 ; 1720 130" keyTimes="0; 0.05; 0.18; 1" dur="60s" repeatCount="indefinite"/>
+        <g>
+            <animateTransform attributeName="transform" type="translate" values="0 0; 0 -10; 0 0" dur="3s" repeatCount="indefinite" additive="sum"/>
+            <use href="#gbBalloon"/>
+        </g>
+    </g>
+    <g>
+        <animateTransform attributeName="transform" type="translate" values="-80 210 ; -80 210 ; 1700 160 ; 1700 160" keyTimes="0; 0.06; 0.22; 1" dur="60s" repeatCount="indefinite"/>
+        <use href="#gbSparkle"><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="4s" repeatCount="indefinite"/></use>
+    </g>
+
+    <!-- 120s event: rocket launch -->
+    <g transform="translate(1500, 900)">
+        <rect x="-50" y="-8" width="100" height="16" rx="3" fill="#455A64" stroke="#263238" stroke-width="2"/>
+        <rect x="-44" y="8"  width="12" height="22" fill="#263238"/>
+        <rect x="32"  y="8"  width="12" height="22" fill="#263238"/>
+        <line x1="-50" y1="-20" x2="-50" y2="-70" stroke="#263238" stroke-width="3"/>
+        <line x1="50"  y1="-20" x2="50"  y2="-70" stroke="#263238" stroke-width="3"/>
+        <line x1="-50" y1="-70" x2="50"  y2="-70" stroke="#263238" stroke-width="3"/>
+    </g>
+    <g>
+        <animateTransform attributeName="transform" type="translate" values="1500 870 ; 1500 870 ; 1500 -120" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/>
+        <use href="#gbRocket"/>
+    </g>
+    <g transform="translate(1500, 920)"><circle r="6" fill="#ECEFF1"><animate attributeName="r" values="6; 6; 60" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0; 0.9; 0" keyTimes="0; 0.945; 0.95; 1" dur="120s" repeatCount="indefinite"/></circle></g>
+    <g transform="translate(1460, 925)"><circle r="6" fill="#CFD8DC"><animate attributeName="r" values="6; 6; 40" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0; 0.85; 0" keyTimes="0; 0.945; 0.95; 1" dur="120s" repeatCount="indefinite"/></circle></g>
+    <g transform="translate(1540, 925)"><circle r="6" fill="#CFD8DC"><animate attributeName="r" values="6; 6; 45" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0; 0.85; 0" keyTimes="0; 0.945; 0.95; 1" dur="120s" repeatCount="indefinite"/></circle></g>
+
+    <!-- birds -->
+    <g>
+        <animateTransform attributeName="transform" type="translate" values="-80 80; 1700 60" dur="40s" repeatCount="indefinite"/>
+        <use href="#gbBird" x="0" y="0"/>
+        <use href="#gbBird" x="30" y="12"/>
+        <use href="#gbBird" x="60" y="4"/>
+    </g>
+</svg>
+</div>
 
 <!-- Cold-start loading overlay -->
 <div id="bootOverlay" class="boot-overlay">
@@ -572,6 +783,12 @@ function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const el = document.getElementById(id);
     if (el) el.classList.add('active');
+
+    // Animated gear backdrop ONLY on the API-key screen (prof) and the
+    // name-entry screen (student). Everywhere else the original puzzle
+    // background stays.
+    const gearScreens = new Set(['screen-setup', 'screen-join']);
+    document.body.classList.toggle('gear-bg-active', gearScreens.has(id));
 
     // Update phase badge
     const badge = document.getElementById('phaseBadge');
