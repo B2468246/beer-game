@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=7">
+<link rel="stylesheet" href="/static/style.css?v=8">
 </head>
 <body>
 
@@ -635,14 +635,35 @@
         <div id="studentLeaderboard"></div>
     </div>
 
+    <!-- Collapsible Team Summary (round-by-round) -->
+    <div class="card mt-16" id="studentTeamSummaryCard">
+        <div class="flex justify-between items-center" style="cursor:pointer" onclick="toggleStudentTeamSummary()">
+            <h2>&#128202; Team Summary</h2>
+            <span id="studentTeamSummaryToggle" style="font-size:22px;color:var(--text-muted)">&#9656;</span>
+        </div>
+        <p class="text-muted text-sm mt-8">Click to expand. Every round of your team — click a round to see per-role detail.</p>
+        <div id="studentTeamSummaryBody" style="display:none" class="mt-12"></div>
+    </div>
+
     <!-- Collapsible AI reasoning archive -->
     <div class="card mt-16" id="reasoningArchiveCard">
         <div class="flex justify-between items-center" style="cursor:pointer" onclick="toggleReasoningArchive()">
             <h2>&#129504; AI Reasoning Archive</h2>
             <span id="reasoningArchiveToggle" style="font-size:22px;color:var(--text-muted)">&#9656;</span>
         </div>
-        <p class="text-muted text-sm mt-8">Click to expand. Shows what each AI agent said in every round.</p>
+        <p class="text-muted text-sm mt-8">Click to expand. Every round can be opened individually to see what each agent said.</p>
         <div id="reasoningArchiveBody" style="display:none" class="mt-12"></div>
+    </div>
+</div>
+
+<!-- Game-Over Peek modal: shown briefly before throwing student to results -->
+<div class="modal-backdrop" id="gameOverPeekModal" style="display:none">
+    <div class="modal-card" style="max-width:720px">
+        <h2>&#127937; Game Over — your team's result</h2>
+        <div id="gameOverPeekBody" class="mt-12"></div>
+        <div class="flex gap-12 mt-16" style="justify-content:flex-end">
+            <button class="btn btn-primary" onclick="dismissGameOverPeek()">See Full Results &rarr;</button>
+        </div>
     </div>
 </div>
 
@@ -1421,16 +1442,76 @@ function handleGameFinished(msg) {
         renderFinalResults(msg.teams);
         renderPrizes(msg.prizes, 'profPrizes', 'profPrizesCard');
     } else {
-        showScreen('screen-student-results');
+        // Pre-render the results screen silently so everything is ready
+        // behind the peek modal.
         renderStudentResults(msg);
         renderPrizes(msg.prizes, 'studentPrizes', 'studentPrizesCard');
-        // Pull full state to populate the reasoning archive (rounds_data)
         fetchState().then(s => {
             if (s.rounds_data && APP.teamId && s.rounds_data[APP.teamId]) {
                 renderReasoningArchive(s.rounds_data[APP.teamId]);
             }
+            // Team Summary on results screen — same nested-expand UX as prof overview
+            const myTeam = (msg.teams || []).find(t => t.id === APP.teamId);
+            if (myTeam) renderStudentTeamSummary(myTeam);
         }).catch(() => {});
+
+        // Show peek modal with the student's team summary BEFORE throwing
+        // them to the results screen. They dismiss with "See Full Results".
+        const myTeam = (msg.teams || []).find(t => t.id === APP.teamId);
+        showGameOverPeek(myTeam);
     }
+}
+
+// ── Game-Over Peek (brief team summary before results screen) ──
+function showGameOverPeek(team) {
+    const modal = document.getElementById('gameOverPeekModal');
+    const body = document.getElementById('gameOverPeekBody');
+    if (!modal || !body) {
+        showScreen('screen-student-results');
+        return;
+    }
+    if (!team) {
+        body.innerHTML = '<p class="text-muted">Final results are ready.</p>';
+    } else {
+        const roleLines = team.roles.map(r =>
+            `<div class="flex justify-between" style="padding:4px 0">
+                <span><span class="role-badge ${r.role}">${r.role}</span> ${escapeHtml(r.player_name)}</span>
+                <strong>${roleScore(r).toFixed(2)} EUR</strong>
+            </div>`
+        ).join('');
+        body.innerHTML = `
+            <div style="font-size:15px;margin-bottom:10px">
+                <strong>${escapeHtml(team.name)}</strong> — total cost
+                <span style="color:#E67E22;font-weight:800;font-size:20px">${teamScore(team).toFixed(2)} EUR</span>
+            </div>
+            ${roleLines}
+            <p class="text-muted text-sm mt-12">You'll find the full round-by-round breakdown and AI reasoning on the next screen.</p>
+        `;
+    }
+    modal.style.display = '';
+}
+
+function dismissGameOverPeek() {
+    const modal = document.getElementById('gameOverPeekModal');
+    if (modal) modal.style.display = 'none';
+    showScreen('screen-student-results');
+}
+
+// ── Student team-summary card (round-by-round, collapsible) ──
+function toggleStudentTeamSummary() {
+    const body = document.getElementById('studentTeamSummaryBody');
+    const arrow = document.getElementById('studentTeamSummaryToggle');
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    if (arrow) arrow.innerHTML = open ? '&#9656;' : '&#9662;';
+}
+
+function renderStudentTeamSummary(team) {
+    const body = document.getElementById('studentTeamSummaryBody');
+    if (!body) return;
+    // Reuse the nested round-by-round renderer used by the prof overview.
+    body.innerHTML = renderOverviewTeamRounds(team);
 }
 
 function toggleReasoningArchive() {
@@ -1451,7 +1532,13 @@ function renderReasoningArchive(roleData) {
     const maxRound = Math.max(...roles.map(r => roleData[r].length));
     let html = '';
     for (let i = 0; i < maxRound; i++) {
-        html += `<div class="reasoning-round"><div class="reasoning-round-head">Round ${i + 1}</div>`;
+        const rid = `reas-round-${i + 1}`;
+        html += `<div class="reasoning-round">
+            <div class="reasoning-round-head" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleReasoningRound('${rid}')">
+                <span>Round ${i + 1}</span>
+                <span class="overview-toggle" id="${rid}-tog">▸</span>
+            </div>
+            <div class="reasoning-round-body" id="${rid}-body" style="display:none">`;
         for (const role of roles) {
             const r = roleData[role][i];
             if (!r) continue;
@@ -1461,9 +1548,18 @@ function renderReasoningArchive(roleData) {
                 <div class="reasoning-text">${escapeHtml(reasoning)}</div>
             </div>`;
         }
-        html += '</div>';
+        html += '</div></div>';
     }
     body.innerHTML = html;
+}
+
+function toggleReasoningRound(rid) {
+    const b = document.getElementById(`${rid}-body`);
+    const t = document.getElementById(`${rid}-tog`);
+    if (!b) return;
+    const open = b.style.display !== 'none';
+    b.style.display = open ? 'none' : '';
+    if (t) t.textContent = open ? '▸' : '▾';
 }
 
 function escapeHtml(str) {
