@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
 
@@ -27,16 +27,75 @@
      PROFESSOR SCREENS
      ════════════════════════════════════════════════════════════ -->
 
-<!-- Setup Screen (professor) -->
+<!-- API Key Screen (professor) -->
 <div class="screen" id="screen-setup">
     <div class="card" style="max-width:500px;margin:40px auto">
-        <h2>Create a Game Session</h2>
+        <h2>Professor Login</h2>
         <div class="form-group">
             <label>Anthropic API Key</label>
-            <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
-            <div class="hint">Required for AI agents. Set ANTHROPIC_API_KEY env var to pre-fill.</div>
+            <input type="password" id="apiKeyInput" placeholder="sk-ant-..." onkeydown="if(event.key==='Enter')submitApiKey()">
+            <div class="hint">Required for AI agents. Stored in memory only — never written to disk.</div>
         </div>
-        <button class="btn btn-primary btn-lg" style="width:100%" onclick="createSession()">Create Session</button>
+        <button class="btn btn-primary btn-lg" style="width:100%" onclick="submitApiKey()">Continue</button>
+    </div>
+</div>
+
+<!-- Sessions Browser (professor) -->
+<div class="screen" id="screen-prof-sessions">
+    <div class="card" style="max-width:820px;margin:30px auto">
+        <div class="flex justify-between items-center">
+            <h2>Your Sessions</h2>
+            <button class="btn btn-primary" onclick="openCreateSessionDialog()">+ New Session</button>
+        </div>
+        <p class="text-muted text-sm mt-8">Pick an existing session to resume — or start a new one. Right-click a session to delete it.</p>
+        <div id="sessionsList" class="mt-16"></div>
+        <div class="empty-state" id="noSessionsMsg" style="display:none">No sessions yet. Click <strong>+ New Session</strong> to get started.</div>
+    </div>
+</div>
+
+<!-- Create-Session Dialog (inline modal) -->
+<div class="modal-backdrop" id="createSessionModal" style="display:none">
+    <div class="modal-card">
+        <h2>New Session</h2>
+        <div class="form-group">
+            <label>Session name</label>
+            <input type="text" id="newSessionName" placeholder="e.g. Class A — Monday 10:00" onkeydown="if(event.key==='Enter')confirmCreateSession()">
+            <div class="hint">Helps you tell classes apart later.</div>
+        </div>
+        <div class="flex gap-12">
+            <button class="btn btn-outline" onclick="closeCreateSessionDialog()">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmCreateSession()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Session-context menu (right-click) -->
+<div id="sessionCtxMenu" class="ctx-menu" style="display:none">
+    <div class="ctx-item" onclick="ctxOpenSession()">Open</div>
+    <div class="ctx-item" onclick="ctxRenameSession()">Rename…</div>
+    <div class="ctx-item ctx-danger" onclick="ctxDeleteSession()">Delete</div>
+</div>
+
+<!-- Unknown-Session screen (student or prof) -->
+<div class="screen" id="screen-session-gone">
+    <div class="card" style="max-width:480px;margin:60px auto;text-align:center">
+        <h2>Session not available</h2>
+        <p class="text-muted mt-12" id="sessionGoneMsg">
+            This session no longer exists or was deleted by the professor.
+        </p>
+        <button class="btn btn-primary mt-20" onclick="leaveGoneScreen()">OK</button>
+    </div>
+</div>
+
+<!-- Finished-Session Overview (professor) -->
+<div class="screen" id="screen-prof-overview">
+    <div class="card">
+        <div class="flex justify-between items-center">
+            <h2 id="overviewTitle">Session Overview</h2>
+            <button class="btn btn-outline btn-sm" onclick="backToSessionsList()">← All Sessions</button>
+        </div>
+        <p class="text-muted text-sm mt-8">Click a team to expand all rounds, all orders, and the AI reasoning.</p>
+        <div id="overviewBody" class="mt-16"></div>
     </div>
 </div>
 
@@ -421,34 +480,92 @@ document.addEventListener('DOMContentLoaded', () => {
     APP.playerId = localStorage.getItem('beer_player_id');
     APP.playerName = localStorage.getItem('beer_player_name');
 
+    // Session id can come from ?s= (student join link) or ?session=
+    // (professor refresh) or localStorage (last opened by professor).
+    APP.sessionId = params.get('s') || params.get('session') || null;
+    if (APP.isStudent && APP.sessionId) {
+        try { localStorage.setItem('beer_student_session', APP.sessionId); } catch (e) {}
+    } else if (APP.isStudent) {
+        APP.sessionId = localStorage.getItem('beer_student_session') || null;
+    }
+    if (!APP.isStudent && !APP.sessionId) {
+        APP.sessionId = localStorage.getItem('beer_prof_session') || null;
+    }
+
     if (APP.isStudent) {
+        if (!APP.sessionId) {
+            hideBootOverlay();
+            showScreen('screen-join'); // will alert when they try to join
+            return;
+        }
         if (APP.playerId && APP.playerName) {
-            // Try to reconnect
             fetchStateWithRetry().then(s => {
                 hideBootOverlay();
+                if (!s || s.error === 'unknown_session' || !s.phase) {
+                    handleSessionGone();
+                    return;
+                }
                 if (s.players && s.players[APP.playerId]) {
                     handleReconnect(s);
                 } else {
                     showScreen('screen-join');
                 }
-            }).catch(() => { hideBootOverlay(); showScreen('screen-join'); });
+                connectWS();
+            }).catch(() => { hideBootOverlay(); showScreen('screen-join'); connectWS(); });
         } else {
             hideBootOverlay();
             showScreen('screen-join');
+            connectWS();
         }
     } else {
-        fetchStateWithRetry().then(s => {
-            hideBootOverlay();
-            if (s.phase === 'setup') showScreen('screen-setup');
-            else if (s.phase === 'lobby') { initLobbyFromState(s); showScreen('screen-lobby'); }
-            else if (s.phase === 'designing') { initDesigningFromState(s); showScreen('screen-prof-designing'); }
-            else if (s.phase === 'playing') { initPlayingFromState(s); showScreen('screen-prof-playing'); }
-            else if (s.phase === 'finished') { renderFinalResults(s.teams_summary || []); showScreen('screen-prof-results'); }
-        }).catch(() => { hideBootOverlay(); showScreen('screen-setup'); });
+        // Professor: always start at API-key screen unless we already have a key
+        // and a previously-opened session id we can resume.
+        bootProfessor();
     }
-
-    connectWS();
 });
+
+// Called when the backend says the current session doesn't exist anymore
+// (deleted by the prof, container restart, etc.). Bounces to a friendly
+// screen so both prof and student aren't stuck on an empty screen.
+function handleSessionGone() {
+    try { if (APP.ws) APP.ws.close(); } catch (e) {}
+    APP.ws = null;
+    const msg = document.getElementById('sessionGoneMsg');
+    if (msg) {
+        msg.textContent = APP.isStudent
+            ? 'This session no longer exists. Ask your professor for a new join link.'
+            : 'This session was deleted or is no longer available. Going back to the sessions list.';
+    }
+    // Drop any stale session id so the next action re-binds cleanly.
+    if (APP.isStudent) {
+        try { localStorage.removeItem('beer_student_session'); } catch (e) {}
+    } else {
+        try { localStorage.removeItem('beer_prof_session'); } catch (e) {}
+    }
+    APP.sessionId = null;
+    showScreen('screen-session-gone');
+}
+
+function leaveGoneScreen() {
+    if (APP.isStudent) {
+        showScreen('screen-join');
+    } else {
+        showSessionsScreen();
+    }
+}
+
+async function bootProfessor() {
+    try {
+        const r = await fetch('/api/api-key').then(r => r.json()).catch(() => ({set:false}));
+        hideBootOverlay();
+        if (!r.set) { showScreen('screen-setup'); return; }
+        // Key already set on server — go straight to sessions list
+        await showSessionsScreen();
+    } catch (e) {
+        hideBootOverlay();
+        showScreen('screen-setup');
+    }
+}
 
 // ── Screens ────────────────────────────────────────────
 function showScreen(id) {
@@ -459,7 +576,8 @@ function showScreen(id) {
     // Update phase badge
     const badge = document.getElementById('phaseBadge');
     const map = {
-        'screen-setup': 'Setup', 'screen-lobby': 'Lobby',
+        'screen-setup': 'Login', 'screen-prof-sessions': 'Sessions',
+        'screen-prof-overview': 'Overview', 'screen-lobby': 'Lobby',
         'screen-prof-designing': 'Agent Design', 'screen-prof-playing': 'Playing',
         'screen-prof-results': 'Results', 'screen-join': 'Join',
         'screen-student-waiting': 'Waiting', 'screen-student-design': 'Agent Design',
@@ -470,38 +588,66 @@ function showScreen(id) {
 }
 
 // ── API helpers ────────────────────────────────────────
-async function api(path, body) {
-    const resp = await fetch(path, {
-        method: body ? 'POST' : 'GET',
+function urlWithSession(path, extra) {
+    const sep = path.includes('?') ? '&' : '?';
+    let q = APP.sessionId ? `${sep}session_id=${encodeURIComponent(APP.sessionId)}` : '';
+    if (extra) q += (q ? '&' : sep) + extra;
+    return path + q;
+}
+
+async function api(path, body, opts = {}) {
+    const url = opts.noSession ? path : urlWithSession(path);
+    const init = {
+        method: opts.method || (body ? 'POST' : 'GET'),
         headers: body ? {'Content-Type': 'application/json'} : {},
         body: body ? JSON.stringify(body) : undefined,
-    });
+    };
+    const resp = await fetch(url, init);
     return resp.json();
 }
 
 async function fetchState() {
     // Students append their player_id so the server only returns
     // their OWN team's rounds_data (privacy between groups).
+    let path = '/api/state';
     if (APP.isStudent && APP.playerId) {
-        const resp = await fetch(`/api/state?player_id=${encodeURIComponent(APP.playerId)}`);
-        return resp.json();
+        path += `?player_id=${encodeURIComponent(APP.playerId)}`;
     }
-    return api('/api/state');
+    const resp = await fetch(urlWithSession(path));
+    return resp.json();
 }
 
 // ── WebSocket ──────────────────────────────────────────
 function connectWS() {
+    if (!APP.sessionId) return; // not bound to a session yet
+    try { if (APP.ws) APP.ws.close(); } catch (e) {}
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    APP.ws = new WebSocket(`${proto}://${location.host}/ws`);
+    APP.ws = new WebSocket(`${proto}://${location.host}/ws?session_id=${encodeURIComponent(APP.sessionId)}`);
     APP.ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         handleWSMessage(msg);
     };
-    APP.ws.onclose = () => setTimeout(connectWS, 2000);
+    APP.ws.onclose = async (ev) => {
+        // Close code 1008 == policy violation (unknown_session from server)
+        // Close code 1000 + absence from session list == probably deleted.
+        if (ev && ev.code === 1008) { handleSessionGone(); return; }
+        if (APP.sessionId) {
+            try {
+                const r = await fetch(`/api/state?session_id=${encodeURIComponent(APP.sessionId)}`);
+                if (r.status === 404) { handleSessionGone(); return; }
+            } catch (e) {}
+        }
+        setTimeout(connectWS, 2000);
+    };
 }
 
 function handleWSMessage(msg) {
     switch(msg.type) {
+        case 'error':
+            if (msg.message === 'unknown_session') {
+                handleSessionGone();
+            }
+            return;
         case 'player_joined':
             updatePlayerList(msg.players, msg.player_count);
             break;
@@ -570,29 +716,224 @@ function handleWSMessage(msg) {
     }
 }
 
-// ── Professor: Create Session ──────────────────────────
-async function createSession() {
+// ── Professor: API key + sessions browser ──────────────
+async function submitApiKey() {
     const key = document.getElementById('apiKeyInput').value.trim();
-    let result = await api('/api/session', { api_key: key });
-    if (result.error === 'active_session') {
-        const phase = result.phase || 'unknown';
-        const players = result.player_count || 0;
-        const ok = confirm(
-            `An active session is already running.\n` +
-            `Phase: ${phase}, players: ${players}.\n\n` +
-            `Creating a new session will WIPE the current one. Continue?`
-        );
-        if (!ok) return;
-        result = await api('/api/session', { api_key: key, force: true });
+    if (!key) { alert('Please paste your API key.'); return; }
+    const r = await api('/api/api-key', { api_key: key }, { noSession: true });
+    if (r.error) { alert(r.error); return; }
+    await showSessionsScreen();
+}
+
+async function showSessionsScreen() {
+    showScreen('screen-prof-sessions');
+    await refreshSessionsList();
+}
+
+async function refreshSessionsList() {
+    const r = await fetch('/api/sessions').then(r => r.json()).catch(() => ({sessions: []}));
+    const list = document.getElementById('sessionsList');
+    const empty = document.getElementById('noSessionsMsg');
+    const items = r.sessions || [];
+    if (!items.length) {
+        list.innerHTML = '';
+        empty.style.display = '';
+        return;
     }
-    if (result.error) { alert(result.error); return; }
-    APP.sessionId = result.session_id;
+    empty.style.display = 'none';
+    list.innerHTML = items.map(s => {
+        const phaseLabel = ({lobby:'Lobby', designing:'Designing', playing:'Playing', finished:'Finished'})[s.phase] || s.phase;
+        const phaseClass = `phase-${s.phase || 'lobby'}`;
+        const updated = s.updated_at ? new Date(s.updated_at * 1000).toLocaleString() : '';
+        return `<div class="session-item" data-sid="${s.session_id}"
+                 onclick="openSession('${s.session_id}')"
+                 oncontextmenu="openSessionCtxMenu(event, '${s.session_id}'); return false;">
+            <div class="session-main">
+                <div class="session-name">${escapeHtml(s.name || s.session_id)}</div>
+                <div class="session-meta">
+                    <span class="phase-pill ${phaseClass}">${phaseLabel}</span>
+                    <span>${s.player_count} player${s.player_count !== 1 ? 's' : ''}</span>
+                    <span>${s.team_count} team${s.team_count !== 1 ? 's' : ''}</span>
+                    <span>Round ${s.current_round}/${s.total_rounds}</span>
+                    <span class="text-muted">${updated}</span>
+                </div>
+            </div>
+            <button class="session-dots" onclick="event.stopPropagation(); openSessionCtxMenu(event, '${s.session_id}')" title="Actions">⋯</button>
+        </div>`;
+    }).join('');
+}
+
+function openCreateSessionDialog() {
+    document.getElementById('newSessionName').value = '';
+    document.getElementById('createSessionModal').style.display = '';
+    setTimeout(() => document.getElementById('newSessionName').focus(), 30);
+}
+function closeCreateSessionDialog() {
+    document.getElementById('createSessionModal').style.display = 'none';
+}
+
+async function confirmCreateSession() {
+    const name = document.getElementById('newSessionName').value.trim();
+    const r = await api('/api/sessions', { name }, { noSession: true });
+    if (r.error) { alert(r.error); return; }
+    closeCreateSessionDialog();
+    APP.sessionId = r.session_id;
+    try { localStorage.setItem('beer_prof_session', APP.sessionId); } catch (e) {}
     initLobby();
+    connectWS();
     showScreen('screen-lobby');
 }
 
+async function openSession(sid) {
+    APP.sessionId = sid;
+    try { localStorage.setItem('beer_prof_session', sid); } catch (e) {}
+    connectWS();
+    const s = await fetchState();
+    if (!s || s.error || !s.phase) { handleSessionGone(); return; }
+    if (s.phase === 'finished') {
+        renderSessionOverview(s);
+        showScreen('screen-prof-overview');
+    } else if (s.phase === 'lobby') {
+        initLobbyFromState(s);
+        initLobby();
+        showScreen('screen-lobby');
+    } else if (s.phase === 'designing') {
+        initDesigningFromState(s);
+        showScreen('screen-prof-designing');
+    } else if (s.phase === 'playing') {
+        initPlayingFromState(s);
+        showScreen('screen-prof-playing');
+    }
+}
+
+function backToSessionsList() {
+    APP.sessionId = null;
+    try { localStorage.removeItem('beer_prof_session'); } catch (e) {}
+    try { if (APP.ws) APP.ws.close(); } catch (e) {}
+    showSessionsScreen();
+}
+
+// ── Right-click context menu ───────────────────────────
+let _ctxSessionId = null;
+function openSessionCtxMenu(ev, sid) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    _ctxSessionId = sid;
+    const m = document.getElementById('sessionCtxMenu');
+    m.style.display = '';
+    const x = (ev.clientX || 0);
+    const y = (ev.clientY || 0);
+    m.style.left = x + 'px';
+    m.style.top = y + 'px';
+}
+function hideSessionCtxMenu() {
+    document.getElementById('sessionCtxMenu').style.display = 'none';
+    _ctxSessionId = null;
+}
+document.addEventListener('click', () => hideSessionCtxMenu());
+
+function ctxOpenSession() { if (_ctxSessionId) { const sid = _ctxSessionId; hideSessionCtxMenu(); openSession(sid); } }
+async function ctxRenameSession() {
+    if (!_ctxSessionId) return;
+    const sid = _ctxSessionId;
+    hideSessionCtxMenu();
+    const name = prompt('New session name:');
+    if (!name) return;
+    // Simple rename: settings endpoint doesn't cover name; reuse /api/sessions POST? No.
+    // We'll PATCH via a tiny endpoint — for now, fall back: not supported.
+    alert('Renaming is not implemented yet.');
+}
+async function ctxDeleteSession() {
+    if (!_ctxSessionId) return;
+    const sid = _ctxSessionId;
+    hideSessionCtxMenu();
+    const ok = confirm('Permanently delete this session? This cannot be undone.');
+    if (!ok) return;
+    const r = await fetch(`/api/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' }).then(r => r.json());
+    if (r && r.error) { alert(r.error); return; }
+    if (APP.sessionId === sid) APP.sessionId = null;
+    refreshSessionsList();
+}
+
+// ── Finished-session overview ──────────────────────────
+function renderSessionOverview(s) {
+    document.getElementById('overviewTitle').textContent =
+        `Session Overview — Round ${s.current_round}/${s.total_rounds}`;
+    const body = document.getElementById('overviewBody');
+    const teams = (s.teams_summary || []).slice().sort((a,b) => teamScore(a) - teamScore(b));
+    if (!teams.length) { body.innerHTML = '<p class="text-muted">This session has no completed rounds yet.</p>'; return; }
+    body.innerHTML = teams.map((team, i) => {
+        const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
+        const roleSummary = team.roles.map(r =>
+            `<span class="role-badge ${r.role}">${r.role}</span> ${r.player_name} <span class="text-muted">(${roleScore(r).toFixed(2)})</span>`
+        ).join(' · ');
+        return `<div class="overview-team">
+            <div class="overview-team-head" onclick="toggleOverviewTeam('${team.id}')">
+                <div class="lb-rank ${rankClass}">${i+1}</div>
+                <div class="overview-team-info">
+                    <div class="team-name">${escapeHtml(team.name)}</div>
+                    <div class="team-members">${roleSummary}</div>
+                </div>
+                <div class="lb-cost">${teamScore(team).toFixed(2)}<span class="unit">EUR</span></div>
+                <span class="overview-toggle" id="overview-toggle-${team.id}">▸</span>
+            </div>
+            <div class="overview-team-body" id="overview-body-${team.id}" style="display:none">
+                ${renderOverviewTeamRounds(team)}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleOverviewTeam(tid) {
+    const body = document.getElementById(`overview-body-${tid}`);
+    const tog = document.getElementById(`overview-toggle-${tid}`);
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    if (tog) tog.textContent = open ? '▸' : '▾';
+}
+
+function renderOverviewTeamRounds(team) {
+    const ROLES_ORDER = ['Retailer', 'Wholesaler', 'Distributor', 'Manufacturer'];
+    const maxRound = Math.max(...team.roles.map(r => (r.rounds || []).length), 0);
+    if (!maxRound) return '<p class="text-muted">No round data.</p>';
+    let html = '';
+    for (let i = 0; i < maxRound; i++) {
+        const rid = `${team.id}-round-${i+1}`;
+        html += `<div class="overview-round">
+            <div class="overview-round-head" onclick="toggleOverviewRound('${rid}')">
+                <strong>Round ${i+1}</strong>
+                <span class="overview-toggle" id="overview-rtog-${rid}">▸</span>
+            </div>
+            <div class="overview-round-body" id="overview-rbody-${rid}" style="display:none">`;
+        for (const roleName of ROLES_ORDER) {
+            const r = team.roles.find(x => x.role === roleName);
+            if (!r) continue;
+            const rd = (r.rounds || [])[i];
+            if (!rd) continue;
+            html += `<div class="overview-role-row">
+                <div class="overview-role-head"><span class="role-badge ${roleName}">${roleName}</span> ${escapeHtml(r.player_name)} — ordered <strong>${rd.order}</strong></div>
+                <div class="overview-role-stats">Demand ${rd.demand} · Stock ${rd.inventory} · Backlog ${rd.backlog} · Pipeline ${rd.pipeline} · Cost ${rd.cost.toFixed(2)} EUR</div>
+                ${rd.reasoning ? `<div class="overview-reasoning">${escapeHtml(rd.reasoning)}</div>` : ''}
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+    return html;
+}
+
+function toggleOverviewRound(rid) {
+    const body = document.getElementById(`overview-rbody-${rid}`);
+    const tog = document.getElementById(`overview-rtog-${rid}`);
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    if (tog) tog.textContent = open ? '▸' : '▾';
+}
+
 function initLobby() {
-    const url = `${location.origin}/?join=true`;
+    if (!APP.sessionId) return;
+    const url = `${location.origin}/?join=true&s=${encodeURIComponent(APP.sessionId)}`;
     document.getElementById('joinUrl').textContent = url;
 }
 
@@ -957,6 +1298,10 @@ async function kickAllPlayers() {
 
 // ── Student: Join ──────────────────────────────────────
 async function joinGame() {
+    if (!APP.sessionId) {
+        alert('No session in this link. Ask your professor for a fresh join link.');
+        return;
+    }
     const name = document.getElementById('playerNameInput').value.trim();
     if (!name) return;
     const result = await api('/api/join', { name });

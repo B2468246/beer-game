@@ -1173,3 +1173,158 @@ textarea { resize: vertical; min-height: 80px; }
     50% { opacity: 0.7; transform: scale(0.97); }
 }
 
+/* ── Sessions browser ─────────────────────────────────── */
+.session-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.12s, border-color 0.12s;
+}
+.session-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    border-color: var(--primary);
+}
+.session-main { flex: 1; min-width: 0; }
+.session-name { font-weight: 700; font-size: 16px; color: var(--text); }
+.session-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    align-items: center;
+}
+.session-dots {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+.session-dots:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+
+.phase-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 11px;
+    color: white;
+}
+.phase-lobby     { background: #78909C; }
+.phase-designing { background: #FB8C00; }
+.phase-playing   { background: #43A047; }
+.phase-finished  { background: #1E88E5; }
+
+/* Modal */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9000;
+}
+.modal-card {
+    background: white;
+    border-radius: 14px;
+    padding: 28px 30px;
+    width: 92%;
+    max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+/* Right-click context menu */
+.ctx-menu {
+    position: fixed;
+    z-index: 9500;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    min-width: 160px;
+    padding: 4px 0;
+    font-size: 14px;
+}
+.ctx-item {
+    padding: 8px 14px;
+    cursor: pointer;
+    color: var(--text);
+}
+.ctx-item:hover { background: #F1F8FE; }
+.ctx-item.ctx-danger { color: #C62828; }
+.ctx-item.ctx-danger:hover { background: #FFEBEE; }
+
+/* Finished-session overview */
+.overview-team {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    background: white;
+    overflow: hidden;
+}
+.overview-team-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+}
+.overview-team-head:hover { background: #FAFBFC; }
+.overview-team-info { flex: 1; min-width: 0; }
+.overview-toggle { font-size: 18px; color: var(--text-muted); }
+
+.overview-team-body {
+    padding: 12px 16px 18px;
+    background: #F7F9FB;
+    border-top: 1px solid var(--border);
+}
+.overview-round {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+.overview-round-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+.overview-round-head:hover { background: #F1F8FE; }
+.overview-round-body { padding: 8px 14px 14px; border-top: 1px solid var(--border); }
+
+.overview-role-row {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #FAFBFC;
+    border-left: 3px solid var(--primary);
+    border-radius: 6px;
+}
+.overview-role-head { font-weight: 600; font-size: 14px; }
+.overview-role-stats { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.overview-reasoning {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+

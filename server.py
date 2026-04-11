@@ -12,21 +12,27 @@ import string
 import time
 import uuid
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import Optional
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-# ── Global game state (in-memory, no DB) ─────────────────────────────────────
+# ── Multi-session game state (in-memory + per-session JSON snapshots) ────────
+#
+# We store one state dict per session inside `sessions`. A ContextVar binds the
+# "currently active" session for each request/task, and a thin StateProxy
+# routes legacy `state["x"]` access through that ContextVar so the existing
+# game-engine functions don't need to be rewritten.
 
-state = {
-    "phase": "setup",  # setup | lobby | designing | playing | finished
-    "session_id": None,
-    "api_key": None,
-    "settings": {
+ROLES = ["Retailer", "Wholesaler", "Distributor", "Manufacturer"]
+
+
+def default_settings() -> dict:
+    return {
         "rounds": 10,
         "lead_time": 2,
         "initial_inventory": 12,
@@ -36,57 +42,142 @@ state = {
         "demand_type": "step",       # "step" or "step_variance"
         "step_demand_before": 4,
         "step_demand_after": 8,
-        "step_round": 5,             # demand changes at this round (1-indexed)
-        "demand_std": 2,             # standard deviation (only used for step_variance)
-        "warmup_rounds": 3,          # first N rounds don't count for scoring
-        "max_games_per_player": 3,   # how many games each student may start
-    },
-    "players": {},       # {player_id: {name, roles:[], strategies:{}, locked_in:bool}}
-    "teams": [],         # [{id, name, members:[], role_map:{role: player_id}}]
-    "rounds_data": {},   # {team_id: {role: [{round, demand, inventory, backlog, pipeline, outstanding, order, cost, reasoning, incoming_shipment}]}}
-    "current_round": 0,
-    "demand_sequence": [],
-    "created_at": None,
-}
+        "step_round": 5,
+        "demand_std": 2,
+        "warmup_rounds": 3,
+        "max_games_per_player": 3,
+    }
 
-ws_clients: list[WebSocket] = []
 
-ROLES = ["Retailer", "Wholesaler", "Distributor", "Manufacturer"]
+def make_empty_session(session_id: str, name: str = "") -> dict:
+    return {
+        "session_id": session_id,
+        "name": name or f"Session {session_id}",
+        "phase": "lobby",  # lobby | designing | playing | finished
+        "settings": default_settings(),
+        "players": {},
+        "teams": [],
+        "rounds_data": {},
+        "current_round": 0,
+        "demand_sequence": [],
+        "created_at": time.time(),
+        "updated_at": time.time(),
+    }
 
-# ── Persistence (JSON snapshot) ──────────────────────────────────────────────
-# Render free tier has ephemeral storage; this still survives WebSocket drops
-# and browser-close reconnects within the container lifetime.
 
-STATE_FILE = os.environ.get("BEERGAME_STATE_FILE",
-                            os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_state.json"))
+sessions: dict[str, dict] = {}                      # session_id -> state dict
+session_ws_clients: dict[str, list[WebSocket]] = {} # session_id -> [ws, ...]
+
+# Single API key shared across sessions for the duration of the container.
+# Kept in memory only; never persisted to disk.
+api_key_global: Optional[str] = os.environ.get("ANTHROPIC_API_KEY") or None
+
+_current_session_id: ContextVar[Optional[str]] = ContextVar("current_session_id", default=None)
+
+
+class StateProxy:
+    """Dict-like view onto sessions[ContextVar('current_session_id')]."""
+
+    def _bound(self) -> dict:
+        sid = _current_session_id.get()
+        if sid is None or sid not in sessions:
+            raise KeyError("No session bound to this request/task")
+        return sessions[sid]
+
+    def __getitem__(self, key):
+        return self._bound()[key]
+
+    def __setitem__(self, key, value):
+        d = self._bound()
+        d[key] = value
+        d["updated_at"] = time.time()
+
+    def __contains__(self, key):
+        try:
+            return key in self._bound()
+        except KeyError:
+            return False
+
+    def get(self, key, default=None):
+        try:
+            return self._bound().get(key, default)
+        except KeyError:
+            return default
+
+    def setdefault(self, key, default):
+        return self._bound().setdefault(key, default)
+
+
+state = StateProxy()
+
+
+# ── Persistence (one JSON file per session) ──────────────────────────────────
+# Render free tier has ephemeral storage; survives WS drops + browser-close
+# reconnects within the container lifetime, and across deploys ONLY if a
+# persistent disk is mounted at SESSIONS_DIR.
+
+SESSIONS_DIR = os.environ.get(
+    "BEERGAME_SESSIONS_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions"),
+)
+
+
+def _session_file(session_id: str) -> str:
+    safe = re.sub(r"[^a-zA-Z0-9_\-]", "", session_id)
+    return os.path.join(SESSIONS_DIR, f"{safe}.json")
 
 
 def save_state() -> None:
-    try:
-        snapshot = {k: v for k, v in state.items() if k != "api_key"}
-        # api_key kept separately so it's never written to disk
-        with open(STATE_FILE, "w") as f:
-            json.dump(snapshot, f)
-    except Exception as e:
-        print(f"[persist] save failed: {e}")
-
-
-def load_state() -> None:
-    if not os.path.exists(STATE_FILE):
+    """Persist the currently-bound session to disk."""
+    sid = _current_session_id.get()
+    if sid is None or sid not in sessions:
         return
     try:
-        with open(STATE_FILE) as f:
-            snapshot = json.load(f)
-        for k, v in snapshot.items():
-            state[k] = v
-        # Pick up API key from env on restart
-        state["api_key"] = os.environ.get("ANTHROPIC_API_KEY", state.get("api_key"))
-        # If server crashed mid-game, revert to designing so players can resume
-        if state.get("phase") == "playing":
-            state["phase"] = "designing"
-        print(f"[persist] restored state: phase={state.get('phase')}, players={len(state.get('players', {}))}")
+        os.makedirs(SESSIONS_DIR, exist_ok=True)
+        with open(_session_file(sid), "w") as f:
+            json.dump(sessions[sid], f)
     except Exception as e:
-        print(f"[persist] load failed: {e}")
+        print(f"[persist] save failed for {sid}: {e}")
+
+
+def load_all_sessions() -> None:
+    """Load every saved session from disk into memory."""
+    if not os.path.isdir(SESSIONS_DIR):
+        return
+    loaded = 0
+    for fname in os.listdir(SESSIONS_DIR):
+        if not fname.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(SESSIONS_DIR, fname)) as f:
+                snapshot = json.load(f)
+            sid = snapshot.get("session_id") or fname.replace(".json", "")
+            # If a session was crashed mid-game, drop back to designing so
+            # players can resume — the round loop won't auto-restart.
+            if snapshot.get("phase") == "playing":
+                snapshot["phase"] = "designing"
+            sessions[sid] = snapshot
+            loaded += 1
+        except Exception as e:
+            print(f"[persist] failed to load {fname}: {e}")
+    if loaded:
+        print(f"[persist] restored {loaded} session(s) from {SESSIONS_DIR}")
+
+
+def delete_session_file(session_id: str) -> None:
+    p = _session_file(session_id)
+    try:
+        if os.path.exists(p):
+            os.remove(p)
+    except Exception as e:
+        print(f"[persist] delete failed for {session_id}: {e}")
+
+
+def new_session_id() -> str:
+    while True:
+        sid = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        if sid not in sessions:
+            return sid
 
 
 # ── Demand generation ─────────────────────────────────────────────────────────
@@ -453,7 +544,7 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
                 objective=objective,
             )
             user_msg = build_user_message(role, round_num, rd, history)
-            ai_tasks.append((role, call_claude(state["api_key"], sys_prompt, user_msg)))
+            ai_tasks.append((role, call_claude(api_key_global or "", sys_prompt, user_msg)))
 
     # Run all AI calls concurrently
     results = {}
@@ -597,29 +688,60 @@ def compute_prizes(summaries: list[dict]) -> dict:
     return prizes
 
 
-# ── WebSocket broadcasting ────────────────────────────────────────────────────
+# ── WebSocket broadcasting (per-session) ──────────────────────────────────────
 
 async def broadcast(msg: dict):
-    dead = []
+    """Send to every WS client subscribed to the currently bound session."""
+    sid = _current_session_id.get()
+    if sid is None:
+        return
     text = json.dumps(msg)
-    for ws in ws_clients:
+    dead = []
+    for ws in session_ws_clients.get(sid, []):
         try:
             await ws.send_text(text)
         except Exception:
             dead.append(ws)
-    for ws in dead:
-        ws_clients.remove(ws)
+    if dead:
+        clients = session_ws_clients.get(sid, [])
+        for ws in dead:
+            if ws in clients:
+                clients.remove(ws)
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    load_state()
+    load_all_sessions()
     yield
-    save_state()
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.middleware("http")
+async def bind_session_middleware(request: Request, call_next):
+    """Bind ContextVar from ?session_id= query param so legacy `state["x"]`
+    access inside endpoints transparently routes to the right session."""
+    sid = request.query_params.get("session_id")
+    token = None
+    if sid and sid in sessions:
+        token = _current_session_id.set(sid)
+    try:
+        return await call_next(request)
+    finally:
+        if token is not None:
+            _current_session_id.reset(token)
+
+
+def _bind_session_or_400(sid: Optional[str]):
+    """Helper for endpoints that REQUIRE a bound session."""
+    if not sid:
+        return JSONResponse({"error": "session_id required"}, status_code=400)
+    if sid not in sessions:
+        return JSONResponse({"error": "session not found"}, status_code=404)
+    return None
+
 
 # Serve static files
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -631,47 +753,100 @@ async def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-@app.post("/api/session")
-async def create_session(body: dict):
-    api_key = body.get("api_key", "").strip()
-    if not api_key:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+@app.post("/api/api-key")
+async def set_api_key(body: dict):
+    """Professor sets the shared Anthropic API key (in-memory only)."""
+    global api_key_global
+    key = (body.get("api_key") or "").strip()
+    if not key:
+        return JSONResponse({"error": "API key required"}, status_code=400)
+    api_key_global = key
+    return {"ok": True}
+
+
+@app.get("/api/api-key")
+async def has_api_key():
+    return {"set": bool(api_key_global)}
+
+
+def _session_summary(snap: dict) -> dict:
+    return {
+        "session_id": snap.get("session_id"),
+        "name": snap.get("name") or f"Session {snap.get('session_id')}",
+        "phase": snap.get("phase"),
+        "player_count": len(snap.get("players") or {}),
+        "team_count": len(snap.get("teams") or []),
+        "current_round": snap.get("current_round", 0),
+        "total_rounds": (snap.get("settings") or {}).get("rounds", 0),
+        "created_at": snap.get("created_at"),
+        "updated_at": snap.get("updated_at"),
+    }
+
+
+@app.get("/api/sessions")
+async def list_sessions():
+    """List every session the professor can resume or inspect."""
+    items = [_session_summary(s) for s in sessions.values()]
+    items.sort(key=lambda s: s.get("updated_at") or 0, reverse=True)
+    return {"sessions": items, "api_key_set": bool(api_key_global)}
+
+
+@app.post("/api/sessions")
+async def create_session_v2(body: dict):
+    """Create a brand-new session. API key must already be set via /api/api-key
+    (or be provided here as a convenience)."""
+    global api_key_global
+    api_key = (body.get("api_key") or "").strip()
+    if api_key:
+        api_key_global = api_key
+    if not api_key_global:
         return JSONResponse({"error": "API key required"}, status_code=400)
 
-    # Guard: refuse to clobber an active session unless explicitly forced.
-    force = bool(body.get("force"))
-    if not force and state.get("session_id") and state.get("phase") not in (None, "setup", "finished"):
-        return JSONResponse(
-            {
-                "error": "active_session",
-                "message": "An active game session already exists.",
-                "phase": state.get("phase"),
-                "player_count": len(state.get("players", {})),
-                "created_at": state.get("created_at"),
-            },
-            status_code=409,
-        )
+    name = (body.get("name") or "").strip()
+    sid = new_session_id()
+    snap = make_empty_session(sid, name=name)
 
-    # Apply settings if provided
-    settings_update = body.get("settings", {})
+    # Apply optional settings overrides up-front
+    settings_update = body.get("settings") or {}
     for k, v in settings_update.items():
-        if k in state["settings"]:
-            state["settings"][k] = v
+        if k in snap["settings"]:
+            snap["settings"][k] = v
+    snap["demand_sequence"] = generate_demand_sequence(snap["settings"])
 
-    state["api_key"] = api_key
-    state["session_id"] = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    state["phase"] = "lobby"
-    state["players"] = {}
-    state["teams"] = []
-    state["rounds_data"] = {}
-    state["current_round"] = 0
-    state["created_at"] = time.time()
-    state["demand_sequence"] = generate_demand_sequence(state["settings"])
+    sessions[sid] = snap
+    session_ws_clients.setdefault(sid, [])
 
-    save_state()
-    await broadcast({"type": "session_created", "session_id": state["session_id"]})
-    return {"session_id": state["session_id"], "settings": state["settings"]}
+    # Bind so save_state() targets the new session.
+    token = _current_session_id.set(sid)
+    try:
+        save_state()
+    finally:
+        _current_session_id.reset(token)
+
+    return {"session_id": sid, "name": snap["name"], "settings": snap["settings"]}
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    if session_id not in sessions:
+        return JSONResponse({"error": "session not found"}, status_code=404)
+    # Close any subscribed WS clients gracefully
+    for ws in list(session_ws_clients.get(session_id, [])):
+        try:
+            await ws.close(code=1000)
+        except Exception:
+            pass
+    session_ws_clients.pop(session_id, None)
+    sessions.pop(session_id, None)
+    delete_session_file(session_id)
+    return {"ok": True}
+
+
+# Legacy endpoint kept for older clients — proxies to the v2 creator and
+# returns the same shape the old frontend expected.
+@app.post("/api/session")
+async def create_session_legacy(body: dict):
+    return await create_session_v2(body)
 
 
 @app.post("/api/settings")
@@ -851,7 +1026,20 @@ async def _begin_game_internal():
     save_state()
 
     await broadcast({"type": "game_begin", "total_rounds": state["settings"]["rounds"]})
-    asyncio.create_task(run_game())
+
+    # Capture the currently bound session id and rebind it inside the
+    # background task so `state[...]`, `save_state()` and `broadcast()` keep
+    # targeting the right session.
+    sid = _current_session_id.get()
+
+    async def _run_game_in_session():
+        token = _current_session_id.set(sid)
+        try:
+            await run_game()
+        finally:
+            _current_session_id.reset(token)
+
+    asyncio.create_task(_run_game_in_session())
 
 
 @app.post("/api/begin")
@@ -931,6 +1119,8 @@ def _team_id_for_player(player_id: str) -> Optional[str]:
 
 @app.get("/api/state")
 async def get_state(player_id: Optional[str] = None):
+    if _current_session_id.get() is None:
+        return JSONResponse({"error": "unknown_session"}, status_code=404)
     max_games = state["settings"].get("max_games_per_player", 3)
     players_info = {pid: {
         "name": p["name"],
@@ -976,14 +1166,24 @@ async def get_state(player_id: Optional[str] = None):
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    sid = ws.query_params.get("session_id")
     await ws.accept()
-    ws_clients.append(ws)
+    if not sid or sid not in sessions:
+        try:
+            await ws.send_text(json.dumps({"type": "error", "message": "unknown_session"}))
+        finally:
+            await ws.close(code=1008)
+        return
+    clients = session_ws_clients.setdefault(sid, [])
+    clients.append(ws)
     try:
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:
-        if ws in ws_clients:
-            ws_clients.remove(ws)
+        pass
+    finally:
+        if ws in clients:
+            clients.remove(ws)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
