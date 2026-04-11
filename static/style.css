@@ -1359,3 +1359,24 @@ textarea { resize: vertical; min-height: 80px; }
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Game-level collapsible group (one block per played Game) */
+.game-group {
+    border: 2px solid #C9A876;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(93, 64, 28, 0.08);
+}
+.game-group-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    font-size: 16px;
+    cursor: pointer;
+    background: linear-gradient(90deg, #FFF8EE 0%, #FDF4E3 100%);
+    border-radius: 10px 10px 0 0;
+}
+.game-group-head:hover { background: linear-gradient(90deg, #FFF3DC 0%, #FBEBCE 100%); }
+.game-group-body { padding: 14px 16px 16px; border-top: 1px solid var(--border); }
+

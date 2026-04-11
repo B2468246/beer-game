@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=8">
+<link rel="stylesheet" href="/static/style.css?v=9">
 </head>
 <body>
 
@@ -1510,8 +1510,10 @@ function toggleStudentTeamSummary() {
 function renderStudentTeamSummary(team) {
     const body = document.getElementById('studentTeamSummaryBody');
     if (!body) return;
-    // Reuse the nested round-by-round renderer used by the prof overview.
-    body.innerHTML = renderOverviewTeamRounds(team);
+    // Reuse the nested round-by-round renderer used by the prof overview,
+    // wrapped in a Game-level collapsible group.
+    const inner = renderOverviewTeamRounds(team);
+    body.innerHTML = renderGameGroup('team', 1, inner);
 }
 
 function toggleReasoningArchive() {
@@ -1530,32 +1532,44 @@ function renderReasoningArchive(roleData) {
     const roles = ROLES_ORDER.filter(r => roleData[r] && roleData[r].length);
     if (!roles.length) { body.innerHTML = '<p class="text-muted">No reasoning recorded.</p>'; return; }
     const maxRound = Math.max(...roles.map(r => roleData[r].length));
-    let html = '';
+
+    // Build round-by-round content in the original flat format
+    let inner = '';
     for (let i = 0; i < maxRound; i++) {
-        const rid = `reas-round-${i + 1}`;
-        html += `<div class="reasoning-round">
-            <div class="reasoning-round-head" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleReasoningRound('${rid}')">
-                <span>Round ${i + 1}</span>
-                <span class="overview-toggle" id="${rid}-tog">▸</span>
-            </div>
-            <div class="reasoning-round-body" id="${rid}-body" style="display:none">`;
+        inner += `<div class="reasoning-round"><div class="reasoning-round-head">Round ${i + 1}</div>`;
         for (const role of roles) {
             const r = roleData[role][i];
             if (!r) continue;
             const reasoning = (r.reasoning || '').toString();
-            html += `<div class="reasoning-entry">
+            inner += `<div class="reasoning-entry">
                 <div class="reasoning-role"><span class="role-badge ${role.toLowerCase()}">${role}</span> ordered <strong>${r.order}</strong></div>
                 <div class="reasoning-text">${escapeHtml(reasoning)}</div>
             </div>`;
         }
-        html += '</div></div>';
+        inner += '</div>';
     }
-    body.innerHTML = html;
+
+    // Wrap in a Game-level collapsible group. (Currently only the latest
+    // game's data is persisted, so this renders as "Game 1". When history
+    // is added, Game 2, Game 3, ... will appear above it.)
+    body.innerHTML = renderGameGroup('reas', 1, inner);
 }
 
-function toggleReasoningRound(rid) {
-    const b = document.getElementById(`${rid}-body`);
-    const t = document.getElementById(`${rid}-tog`);
+// ── Game-level collapsible group (shared by reasoning archive + team summary) ──
+function renderGameGroup(prefix, gameNum, innerHtml) {
+    const gid = `${prefix}-game-${gameNum}`;
+    return `<div class="game-group">
+        <div class="game-group-head" onclick="toggleGameGroup('${gid}')">
+            <strong>Game ${gameNum}</strong>
+            <span class="overview-toggle" id="${gid}-tog">▸</span>
+        </div>
+        <div class="game-group-body" id="${gid}-body" style="display:none">${innerHtml}</div>
+    </div>`;
+}
+
+function toggleGameGroup(gid) {
+    const b = document.getElementById(`${gid}-body`);
+    const t = document.getElementById(`${gid}-tog`);
     if (!b) return;
     const open = b.style.display !== 'none';
     b.style.display = open ? 'none' : '';
