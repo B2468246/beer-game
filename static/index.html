@@ -273,6 +273,18 @@
             <input type="text" id="newSessionName" placeholder="e.g. Class A — Monday 10:00" onkeydown="if(event.key==='Enter')confirmCreateSession()">
             <div class="hint">Helps you tell classes apart later.</div>
         </div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>Rounds per Game</label>
+                <input type="number" id="newSessionRounds" value="20" min="5" max="100">
+                <div class="hint">How many weeks each game lasts.</div>
+            </div>
+            <div class="form-group">
+                <label>Total Games</label>
+                <input type="number" id="newSessionTotalGames" value="10" min="1" max="50">
+                <div class="hint">How many games will be played in total per student.</div>
+            </div>
+        </div>
         <div class="flex gap-12">
             <button class="btn btn-outline" onclick="closeCreateSessionDialog()">Cancel</button>
             <button class="btn btn-primary" onclick="confirmCreateSession()">Create</button>
@@ -336,17 +348,14 @@
                 <h2>Game Settings</h2>
                 <div class="settings-grid">
                     <div class="form-group">
-                        <label>Rounds</label>
-                        <input type="number" id="set-rounds" value="10" min="5" max="50" onchange="updateSetting('rounds', this.value)">
+                        <label>Rounds per Game</label>
+                        <input type="number" id="set-rounds" value="20" min="5" max="100" onchange="updateSetting('rounds', this.value)">
+                        <div class="hint">How many weeks (rounds) each game lasts.</div>
                     </div>
                     <div class="form-group">
-                        <label>Warmup Rounds</label>
-                        <input type="number" id="set-warmup_rounds" value="3" min="0" max="10" onchange="updateSetting('warmup_rounds', this.value)">
-                        <div class="hint">First N rounds do not count toward the score.</div>
-                    </div>
-                    <div class="form-group">
-                        <label>Max Games per Student</label>
-                        <input type="number" id="set-max_games_per_player" value="3" min="1" max="20" onchange="updateSetting('max_games_per_player', this.value)">
+                        <label>Total Games</label>
+                        <input type="number" id="set-total_games" value="10" min="1" max="50" onchange="updateSetting('total_games', this.value)">
+                        <div class="hint">How many games will be played in total per student.</div>
                     </div>
                     <div class="form-group">
                         <label>Lead Time (weeks)</label>
@@ -982,6 +991,8 @@ async function refreshSessionsList() {
 
 function openCreateSessionDialog() {
     document.getElementById('newSessionName').value = '';
+    document.getElementById('newSessionRounds').value = '20';
+    document.getElementById('newSessionTotalGames').value = '10';
     document.getElementById('createSessionModal').style.display = '';
     setTimeout(() => document.getElementById('newSessionName').focus(), 30);
 }
@@ -991,7 +1002,12 @@ function closeCreateSessionDialog() {
 
 async function confirmCreateSession() {
     const name = document.getElementById('newSessionName').value.trim();
-    const r = await api('/api/sessions', { name }, { noSession: true });
+    const rounds = parseInt(document.getElementById('newSessionRounds').value, 10) || 20;
+    const total_games = parseInt(document.getElementById('newSessionTotalGames').value, 10) || 10;
+    const r = await api('/api/sessions', {
+        name,
+        settings: { rounds, total_games },
+    }, { noSession: true });
     if (r.error) { alert(r.error); return; }
     closeCreateSessionDialog();
     APP.sessionId = r.session_id;
@@ -1231,7 +1247,7 @@ async function studentPlayAgain() {
 // ── Settings ───────────────────────────────────────────
 async function updateSetting(key, value) {
     const v = ['rounds','lead_time','initial_inventory','initial_pipeline','step_demand_before',
-               'step_demand_after','step_round','warmup_rounds','max_games_per_player'].includes(key) ? parseInt(value) :
+               'step_demand_after','step_round','total_games'].includes(key) ? parseInt(value) :
               ['holding_cost','backlog_cost','demand_std'].includes(key) ? parseFloat(value) : value;
     await api('/api/settings', { [key]: v });
 }
@@ -1540,7 +1556,7 @@ async function joinGame() {
 function updateGamesRemaining(player, s) {
     const el = document.getElementById('gamesRemainingInfo');
     if (!el || !player) return;
-    const max = (s.settings && s.settings.max_games_per_player) || 0;
+    const max = (s.settings && (s.settings.total_games ?? s.settings.max_games_per_player)) || 0;
     const played = player.games_played || 0;
     const remaining = player.games_remaining != null ? player.games_remaining : Math.max(0, max - played);
     if (max > 0) {

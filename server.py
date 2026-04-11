@@ -44,8 +44,7 @@ def default_settings() -> dict:
         "step_demand_after": 8,
         "step_round": 5,
         "demand_std": 2,
-        "warmup_rounds": 3,
-        "max_games_per_player": 3,
+        "total_games": 3,
     }
 
 
@@ -617,20 +616,15 @@ def compute_bullwhip(team_states: dict) -> dict:
 
 
 def get_teams_summary() -> list[dict]:
-    """Build a summary of all teams. Scoring excludes warmup rounds."""
-    warmup = int(state["settings"].get("warmup_rounds", 0) or 0)
+    """Build a summary of all teams."""
     summaries = []
     for team in state["teams"]:
         roles_info = []
         total_cost = 0.0          # raw cumulative (all rounds)
-        scored_total = 0.0        # excludes warmup rounds
         for role in ROLES:
             rd_list = state["rounds_data"].get(team["id"], {}).get(role, [])
             cost = rd_list[-1]["cumulative_cost"] if rd_list else 0.0
-            # scored cost = sum of round costs where round > warmup
-            scored_cost = sum(r.get("cost", 0.0) for r in rd_list if r.get("round", 0) > warmup)
             total_cost += cost
-            scored_total += scored_cost
             player_id = team["role_map"][role]
             player = state["players"][player_id]
             strat = player["strategies"].get(role, "rational")
@@ -640,7 +634,7 @@ def get_teams_summary() -> list[dict]:
                 "player_name": player["name"],
                 "strategy": strat,
                 "cost": round(cost, 2),
-                "scored_cost": round(scored_cost, 2),
+                "scored_cost": round(cost, 2),
                 "rounds": rd_list,
             })
         summaries.append({
@@ -648,11 +642,10 @@ def get_teams_summary() -> list[dict]:
             "name": team["name"],
             "members": team["members"],
             "total_cost": round(total_cost, 2),
-            "scored_cost": round(scored_total, 2),
-            "warmup_rounds": warmup,
+            "scored_cost": round(total_cost, 2),
             "roles": roles_info,
         })
-    # Sort by scored cost (the cost that actually counts)
+    # Sort by total cost (lower is better)
     summaries.sort(key=lambda t: t["scored_cost"])
     return summaries
 
@@ -1121,7 +1114,7 @@ def _team_id_for_player(player_id: str) -> Optional[str]:
 async def get_state(player_id: Optional[str] = None):
     if _current_session_id.get() is None:
         return JSONResponse({"error": "unknown_session"}, status_code=404)
-    max_games = state["settings"].get("max_games_per_player", 3)
+    max_games = state["settings"].get("total_games", state["settings"].get("max_games_per_player", 3))
     players_info = {pid: {
         "name": p["name"],
         "roles": p["roles"],
