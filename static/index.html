@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=15">
+<link rel="stylesheet" href="/static/style.css?v=16">
 </head>
 <body>
 
@@ -959,43 +959,6 @@
         <canvas id="chartCost" class="chart-canvas" style="height:160px"></canvas>
     </div>
 
-    <!-- Team summary section: only visible BETWEEN rounds (after round_complete) -->
-    <div id="teamSummarySection">
-        <div class="charts-row mt-16">
-            <div class="chart-container">
-                <h3>Team Cumulative Costs (per role)</h3>
-                <canvas id="chartTeamRoles" class="chart-canvas"></canvas>
-                <div class="chart-legend">
-                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#FF7043"></div> Retailer</div>
-                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#66BB6A"></div> Wholesaler</div>
-                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#42A5F5"></div> Distributor</div>
-                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#AB47BC"></div> Manufacturer</div>
-                </div>
-            </div>
-            <div class="chart-container">
-                <h3>Team Total Cumulative Cost</h3>
-                <canvas id="chartTeamTotal" class="chart-canvas"></canvas>
-                <div class="chart-legend">
-                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E67E22"></div> Your Team (all 4 roles)</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="chart-container mt-16">
-            <h3>Bullwhip Effect per Stage</h3>
-            <p class="text-muted" style="font-size:12px;margin-bottom:8px">
-                Bullwhip = Var(Orders) / Var(Demand) &nbsp;&mdash;&nbsp; values &gt; 1 mean the stage amplifies demand variability.
-            </p>
-            <canvas id="chartBullwhip" class="chart-canvas" style="height:180px"></canvas>
-        </div>
-
-        <!-- Team costs -->
-        <div class="card mt-16">
-            <h2>Team Overview</h2>
-            <div id="teamCostsOverview"></div>
-        </div>
-    </div>
-
     <!-- Computing-round placeholder (visible while AI processes a round) -->
     <div class="card mt-16" id="roundProcessingNote" style="display:none;text-align:center">
         <div class="boot-spinner" style="margin: 0 auto 10px"></div>
@@ -1027,8 +990,43 @@
             <h2>&#128202; Team Summary</h2>
             <span id="studentTeamSummaryToggle" style="font-size:22px;color:var(--text-muted)">&#9656;</span>
         </div>
-        <p class="text-muted text-sm mt-8">Click to expand. Every round of your team — click a round to see per-role detail.</p>
-        <div id="studentTeamSummaryBody" style="display:none" class="mt-12"></div>
+        <p class="text-muted text-sm mt-8">Click to expand. Full team trajectory, charts and bullwhip analysis for every game played.</p>
+        <div id="studentTeamSummaryBody" style="display:none" class="mt-12">
+            <div class="charts-row">
+                <div class="chart-container">
+                    <h3>Team Cumulative Costs (per role)</h3>
+                    <canvas id="chartTeamRoles" class="chart-canvas"></canvas>
+                    <div class="chart-legend">
+                        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#FF7043"></div> Retailer</div>
+                        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#66BB6A"></div> Wholesaler</div>
+                        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#42A5F5"></div> Distributor</div>
+                        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#AB47BC"></div> Manufacturer</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3>Team Total Cumulative Cost</h3>
+                    <canvas id="chartTeamTotal" class="chart-canvas"></canvas>
+                    <div class="chart-legend">
+                        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#E67E22"></div> Your Team (all 4 roles)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container mt-16">
+                <h3>Bullwhip Effect per Stage</h3>
+                <p class="text-muted" style="font-size:12px;margin-bottom:8px">
+                    Bullwhip = Var(Orders) / Var(Demand) &nbsp;&mdash;&nbsp; values &gt; 1 mean the stage amplifies demand variability.
+                </p>
+                <canvas id="chartBullwhip" class="chart-canvas" style="height:180px"></canvas>
+            </div>
+
+            <div class="card mt-16" style="box-shadow:none;border:1px solid var(--border)">
+                <h3>Team Overview</h3>
+                <div id="teamCostsOverview" class="mt-8"></div>
+            </div>
+
+            <div class="mt-16" id="studentTeamSummaryTables"></div>
+        </div>
     </div>
 
     <!-- Collapsible AI reasoning archive -->
@@ -1275,12 +1273,9 @@ function handleWSMessage(msg) {
             else showScreen('screen-prof-playing');
             break;
         case 'round_processing':
-            // Hide team summary while AI computes the next round
-            { const s = document.getElementById('teamSummarySection'); if (s) s.style.display = 'none'; }
             { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = ''; }
             break;
         case 'round_complete':
-            { const s = document.getElementById('teamSummarySection'); if (s) s.style.display = ''; }
             { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = 'none'; }
             handleRoundComplete(msg);
             break;
@@ -1889,17 +1884,73 @@ function toggleStudentTeamSummary() {
     const open = body.style.display !== 'none';
     body.style.display = open ? 'none' : '';
     if (arrow) arrow.innerHTML = open ? '&#9656;' : '&#9662;';
+    // Draw the team charts the first time the card is opened — canvases
+    // need a visible layout box to measure correctly.
+    if (!open) {
+        requestAnimationFrame(() => renderStudentTeamCharts());
+    }
 }
 
 function renderStudentTeamSummary(team) {
-    const body = document.getElementById('studentTeamSummaryBody');
-    if (!body) return;
+    const host = document.getElementById('studentTeamSummaryTables');
+    if (!host) return;
     // Render the flat per-role team-summary tables (the same kind shown at
     // the end of game), wrapped in a Game-level collapsible group. No
     // round-by-round subdivision — each role is one table with one row per
     // round so the full trajectory can be traced back at a glance.
     const inner = renderTeamSummaryTables(team);
-    body.innerHTML = renderGameGroup('team', 1, inner);
+    host.innerHTML = renderGameGroup('team', 1, inner);
+
+    // Stash team + role data on the card so the charts can be drawn when
+    // the card is expanded (canvases need visible dimensions to size).
+    const card = document.getElementById('studentTeamSummaryCard');
+    if (card) {
+        card.__team = team;
+    }
+
+    // Fill the Team Overview block (role costs + total)
+    const tc = document.getElementById('teamCostsOverview');
+    if (tc) {
+        tc.innerHTML = team.roles.map(r =>
+            `<div class="team-cost-row">
+                <span><span class="role-badge ${r.role}">${r.role}</span> ${escapeHtml(r.player_name)}</span>
+                <span class="cost-cell">${roleScore(r).toFixed(2)} EUR</span>
+            </div>`
+        ).join('') + `<div class="team-cost-total">
+            <span>Total Team Cost</span><span class="value">${teamScore(team).toFixed(2)} EUR</span>
+        </div>`;
+    }
+}
+
+function renderStudentTeamCharts() {
+    // Needs rounds_data (per-role time series) from the latest state.
+    fetchState().then(s => {
+        if (!s.rounds_data || !APP.teamId) return;
+        const roleData = s.rounds_data[APP.teamId];
+        if (!roleData) return;
+        const total = s.total_rounds || Math.max(
+            ...Object.values(roleData).map(rs => (rs || []).length), 0
+        );
+        const ROLE_COLORS = { Retailer: '#FF7043', Wholesaler: '#66BB6A', Distributor: '#42A5F5', Manufacturer: '#AB47BC' };
+        const teamRoleDatasets = Object.keys(ROLE_COLORS).map(rn => ({
+            data: (roleData[rn] || []).map(r => r.cumulative_cost),
+            color: ROLE_COLORS[rn], fill: false,
+        }));
+        drawLineChart('chartTeamRoles', teamRoleDatasets, total);
+
+        const nRounds = Math.max(...Object.values(roleData).map(rs => (rs || []).length), 0);
+        const teamTotal = [];
+        for (let i = 0; i < nRounds; i++) {
+            let sum = 0;
+            for (const rn of Object.keys(ROLE_COLORS)) {
+                const rs = roleData[rn] || [];
+                if (rs[i]) sum += rs[i].cumulative_cost;
+            }
+            teamTotal.push(sum);
+        }
+        drawLineChart('chartTeamTotal', [{ data: teamTotal, color: '#E67E22', fill: true }], total);
+        drawBullwhipChart('chartBullwhip', roleData);
+    }).catch(() => {});
 }
 
 function renderTeamSummaryTables(team) {
