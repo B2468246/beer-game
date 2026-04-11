@@ -4,24 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=13">
+<link rel="stylesheet" href="/static/style.css?v=14">
 </head>
 <body>
 
 <!-- Animated gear backdrop — only shown on screen-setup (prof API key) and screen-join (student name). -->
 <div id="gearBackdrop" class="gear-backdrop" aria-hidden="true">
 <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+
     <defs>
+        <!-- warm dotted paper background -->
         <pattern id="gbPaper" x="0" y="0" width="38" height="38" patternUnits="userSpaceOnUse">
             <rect width="38" height="38" fill="#FFF4DA"/>
             <circle cx="19" cy="19" r="1.2" fill="#EBDDBA"/>
         </pattern>
+
+        <!-- soft cloud shape -->
         <g id="gbCloud">
             <ellipse cx="0"   cy="0" rx="28" ry="18" fill="#FFFFFF" opacity="0.9"/>
             <ellipse cx="-22" cy="6" rx="22" ry="14" fill="#FFFFFF" opacity="0.85"/>
             <ellipse cx="24"  cy="6" rx="22" ry="14" fill="#FFFFFF" opacity="0.85"/>
             <ellipse cx="-4"  cy="-10" rx="20" ry="13" fill="#FFFFFF" opacity="0.9"/>
         </g>
+
+        <!-- the gear shape (12 teeth) -->
         <g id="gbGear">
             <g fill="currentColor">
                 <rect x="-7" y="-68" width="14" height="18" rx="2" transform="rotate(0)"/>
@@ -45,6 +51,8 @@
             <circle cx="0" cy="0" r="14" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
             <circle cx="0" cy="0" r="4"  fill="rgba(0,0,0,0.55)"/>
         </g>
+
+        <!-- hot-air balloon -->
         <g id="gbBalloon">
             <ellipse cx="0" cy="-40" rx="46" ry="54" fill="#EF5350"/>
             <path d="M -46 -40 A 46 54 0 0 0 46 -40 L 46 -20 A 46 40 0 0 1 -46 -20 Z" fill="#FFCA28"/>
@@ -54,24 +62,31 @@
             <rect x="-18" y="42" width="36" height="22" rx="3" fill="#8D6E63" stroke="#4E342E" stroke-width="2"/>
             <rect x="-18" y="42" width="36" height="5" fill="#4E342E"/>
         </g>
+
+        <!-- little rocket (slightly bigger than v2) -->
         <g id="gbRocket">
-            <path d="M 0 -50 L 14 0 L 14 26 L -14 26 L -14 0 Z" fill="#F5F5F5" stroke="#37474F" stroke-width="2"/>
-            <path d="M 0 -50 L 14 0 L -14 0 Z" fill="#EF5350" stroke="#37474F" stroke-width="2"/>
-            <circle cx="0" cy="-12" r="6" fill="#90CAF9" stroke="#37474F" stroke-width="2"/>
-            <path d="M -14 10 L -26 30 L -14 26 Z" fill="#EF5350" stroke="#37474F" stroke-width="2"/>
-            <path d="M 14 10 L 26 30 L 14 26 Z" fill="#EF5350" stroke="#37474F" stroke-width="2"/>
+            <path d="M 0 -65 L 18 0 L 18 34 L -18 34 L -18 0 Z" fill="#F5F5F5" stroke="#37474F" stroke-width="2.5"/>
+            <path d="M 0 -65 L 18 0 L -18 0 Z" fill="#EF5350" stroke="#37474F" stroke-width="2.5"/>
+            <circle cx="0" cy="-16" r="8" fill="#90CAF9" stroke="#37474F" stroke-width="2.5"/>
+            <path d="M -18 14 L -34 40 L -18 34 Z" fill="#EF5350" stroke="#37474F" stroke-width="2.5"/>
+            <path d="M 18 14 L 34 40 L 18 34 Z" fill="#EF5350" stroke="#37474F" stroke-width="2.5"/>
+            <!-- flame (only shows when launching — made with animate on opacity) -->
             <g>
-                <path d="M -10 26 Q 0 60 10 26 Z" fill="#FFB300">
+                <path d="M -13 34 Q 0 78 13 34 Z" fill="#FFB300">
                     <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.94;0.95;1;1" dur="120s" repeatCount="indefinite"/>
                 </path>
-                <path d="M -6 26 Q 0 48 6 26 Z" fill="#FFEB3B">
+                <path d="M -8 34 Q 0 62 8 34 Z" fill="#FFEB3B">
                     <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.94;0.95;1;1" dur="120s" repeatCount="indefinite"/>
                 </path>
             </g>
         </g>
+
+        <!-- tiny bird silhouette -->
         <g id="gbBird">
             <path d="M -14 0 Q -7 -10 0 0 Q 7 -10 14 0" fill="none" stroke="#37474F" stroke-width="3" stroke-linecap="round"/>
         </g>
+
+        <!-- star sparkle -->
         <g id="gbSparkle">
             <path d="M 0 -10 L 2 -2 L 10 0 L 2 2 L 0 10 L -2 2 L -10 0 L -2 -2 Z" fill="#FFD54F"/>
         </g>
@@ -79,128 +94,517 @@
 
     <rect width="1600" height="1000" fill="url(#gbPaper)"/>
 
-    <!-- lazy clouds -->
-    <g><animateTransform attributeName="transform" type="translate" from="-120 0" to="1720 0" dur="90s" repeatCount="indefinite"/><use href="#gbCloud" x="0" y="120"/></g>
-    <g><animateTransform attributeName="transform" type="translate" from="-200 0" to="1720 0" dur="130s" repeatCount="indefinite" begin="-40s"/><use href="#gbCloud" x="0" y="200" transform="scale(0.75)"/></g>
-    <g><animateTransform attributeName="transform" type="translate" from="-120 0" to="1720 0" dur="110s" repeatCount="indefinite" begin="-70s"/><use href="#gbCloud" x="0" y="80" transform="scale(1.1)"/></g>
+    <!-- lazy clouds (continuous, slow) -->
+    <g>
+        <animateTransform attributeName="transform" type="translate" from="-120 0" to="1720 0" dur="90s" repeatCount="indefinite"/>
+        <use href="#gbCloud" x="0" y="120"/>
+    </g>
+    <g>
+        <animateTransform attributeName="transform" type="translate" from="-200 0" to="1720 0" dur="130s" repeatCount="indefinite" begin="-40s"/>
+        <use href="#gbCloud" x="0" y="200" transform="scale(0.75)"/>
+    </g>
+    <g>
+        <animateTransform attributeName="transform" type="translate" from="-120 0" to="1720 0" dur="110s" repeatCount="indefinite" begin="-70s"/>
+        <use href="#gbCloud" x="0" y="80" transform="scale(1.1)"/>
+    </g>
 
-    <!-- 17 gears -->
-    <g transform="translate(210, 330)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="26s" repeatCount="indefinite"/><g transform="scale(2.3)"><use href="#gbGear" style="color:#E91E63"/></g></g></g>
-    <g transform="translate(475, 225)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="17s" repeatCount="indefinite"/><g transform="scale(1.35)"><use href="#gbGear" style="color:#FFB300"/></g></g></g>
-    <g transform="translate(630, 135)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="9s" repeatCount="indefinite"/><g transform="scale(0.82)"><use href="#gbGear" style="color:#43A047"/></g></g></g>
-    <g transform="translate(790, 260)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="15s" repeatCount="indefinite"/><g transform="scale(1.5)"><use href="#gbGear" style="color:#039BE5"/></g></g></g>
-    <g transform="translate(1040, 215)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="22s" repeatCount="indefinite"/><g transform="scale(1.18)"><use href="#gbGear" style="color:#8E24AA"/></g></g></g>
-    <g transform="translate(1230, 125)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="10s" repeatCount="indefinite"/><g transform="scale(0.72)"><use href="#gbGear" style="color:#F4511E"/></g></g></g>
-    <g transform="translate(1395, 340)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="24s" repeatCount="indefinite"/><g transform="scale(1.9)"><use href="#gbGear" style="color:#00ACC1"/></g></g></g>
-    <g transform="translate(150, 680)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="19s" repeatCount="indefinite"/><g transform="scale(1.28)"><use href="#gbGear" style="color:#7CB342"/></g></g></g>
-    <g transform="translate(340, 620)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="8s" repeatCount="indefinite"/><g transform="scale(0.7)"><use href="#gbGear" style="color:#FDD835"/></g></g></g>
-    <g transform="translate(530, 750)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="30s" repeatCount="indefinite"/><g transform="scale(2.0)"><use href="#gbGear" style="color:#3949AB"/></g></g></g>
-    <g transform="translate(760, 660)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="11s" repeatCount="indefinite"/><g transform="scale(0.92)"><use href="#gbGear" style="color:#E53935"/></g></g></g>
-    <g transform="translate(960, 780)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="20s" repeatCount="indefinite"/><g transform="scale(1.42)"><use href="#gbGear" style="color:#00897B"/></g></g></g>
-    <g transform="translate(1165, 700)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="7s" repeatCount="indefinite"/><g transform="scale(0.8)"><use href="#gbGear" style="color:#FB8C00"/></g></g></g>
-    <g transform="translate(1410, 800)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="32s" repeatCount="indefinite"/><g transform="scale(1.75)"><use href="#gbGear" style="color:#6D4C41"/></g></g></g>
-    <g transform="translate(420, 480)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="6s" repeatCount="indefinite"/><g transform="scale(0.55)"><use href="#gbGear" style="color:#D81B60"/></g></g></g>
-    <g transform="translate(1100, 470)"><g><animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="5.5s" repeatCount="indefinite"/><g transform="scale(0.5)"><use href="#gbGear" style="color:#1E88E5"/></g></g></g>
-    <g transform="translate(660, 430)"><g><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="6.5s" repeatCount="indefinite"/><g transform="scale(0.48)"><use href="#gbGear" style="color:#FFEB3B"/></g></g></g>
+    <!-- ═══════════════════════════════════════════════
+         GEAR CLUSTER — 17 gears, alternating directions
+         ═══════════════════════════════════════════════ -->
 
-    <!-- pendulum -->
+    <g transform="translate(210, 330)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="26s" repeatCount="indefinite"/>
+        <g transform="scale(2.3)"><use href="#gbGear" style="color:#E91E63"/></g>
+    </g></g>
+
+    <g transform="translate(475, 225)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="17s" repeatCount="indefinite"/>
+        <g transform="scale(1.35)"><use href="#gbGear" style="color:#FFB300"/></g>
+    </g></g>
+
+    <g transform="translate(630, 135)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="9s" repeatCount="indefinite"/>
+        <g transform="scale(0.82)"><use href="#gbGear" style="color:#43A047"/></g>
+    </g></g>
+
+    <g transform="translate(790, 260)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="15s" repeatCount="indefinite"/>
+        <g transform="scale(1.5)"><use href="#gbGear" style="color:#039BE5"/></g>
+    </g></g>
+
+    <g transform="translate(1040, 215)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="22s" repeatCount="indefinite"/>
+        <g transform="scale(1.18)"><use href="#gbGear" style="color:#8E24AA"/></g>
+    </g></g>
+
+    <g transform="translate(1230, 125)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="10s" repeatCount="indefinite"/>
+        <g transform="scale(0.72)"><use href="#gbGear" style="color:#F4511E"/></g>
+    </g></g>
+
+    <g transform="translate(1395, 340)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="24s" repeatCount="indefinite"/>
+        <g transform="scale(1.9)"><use href="#gbGear" style="color:#00ACC1"/></g>
+    </g></g>
+
+    <g transform="translate(150, 680)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="19s" repeatCount="indefinite"/>
+        <g transform="scale(1.28)"><use href="#gbGear" style="color:#7CB342"/></g>
+    </g></g>
+
+    <g transform="translate(340, 620)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="8s" repeatCount="indefinite"/>
+        <g transform="scale(0.7)"><use href="#gbGear" style="color:#FDD835"/></g>
+    </g></g>
+
+    <g transform="translate(530, 750)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="30s" repeatCount="indefinite"/>
+        <g transform="scale(2.0)"><use href="#gbGear" style="color:#3949AB"/></g>
+    </g></g>
+
+    <g transform="translate(760, 660)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="11s" repeatCount="indefinite"/>
+        <g transform="scale(0.92)"><use href="#gbGear" style="color:#E53935"/></g>
+    </g></g>
+
+    <g transform="translate(960, 780)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="20s" repeatCount="indefinite"/>
+        <g transform="scale(1.42)"><use href="#gbGear" style="color:#00897B"/></g>
+    </g></g>
+
+    <g transform="translate(1165, 700)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="7s" repeatCount="indefinite"/>
+        <g transform="scale(0.8)"><use href="#gbGear" style="color:#FB8C00"/></g>
+    </g></g>
+
+    <g transform="translate(1410, 800)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="32s" repeatCount="indefinite"/>
+        <g transform="scale(1.75)"><use href="#gbGear" style="color:#6D4C41"/></g>
+    </g></g>
+
+    <!-- three tiny helper gears -->
+    <g transform="translate(420, 480)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="6s" repeatCount="indefinite"/>
+        <g transform="scale(0.55)"><use href="#gbGear" style="color:#D81B60"/></g>
+    </g></g>
+    <g transform="translate(1100, 470)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="5.5s" repeatCount="indefinite"/>
+        <g transform="scale(0.5)"><use href="#gbGear" style="color:#1E88E5"/></g>
+    </g></g>
+    <g transform="translate(660, 430)"><g>
+        <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="6.5s" repeatCount="indefinite"/>
+        <g transform="scale(0.48)"><use href="#gbGear" style="color:#FFEB3B"/></g>
+    </g></g>
+
+    <!-- ═══════════════════════════════════════════════
+         PENDULUM CLOCK (swings forever)
+         ═══════════════════════════════════════════════ -->
     <g transform="translate(90, 480)">
         <rect x="-8" y="-10" width="16" height="16" rx="2" fill="#4E342E"/>
         <g>
-            <animateTransform attributeName="transform" type="rotate" values="35 0 0; -35 0 0; 35 0 0" keyTimes="0; 0.5; 1" calcMode="spline" keySplines="0.4 0 0.6 1 ; 0.4 0 0.6 1" dur="2.4s" repeatCount="indefinite"/>
+            <animateTransform attributeName="transform" type="rotate"
+                values="35 0 0; -35 0 0; 35 0 0"
+                keyTimes="0; 0.5; 1"
+                calcMode="spline"
+                keySplines="0.4 0 0.6 1 ; 0.4 0 0.6 1"
+                dur="2.4s" repeatCount="indefinite"/>
             <line x1="0" y1="0" x2="0" y2="220" stroke="#6D4C41" stroke-width="5"/>
             <circle cx="0" cy="230" r="22" fill="#FFB300" stroke="#6D4C41" stroke-width="3"/>
             <circle cx="0" cy="230" r="6"  fill="#6D4C41"/>
         </g>
     </g>
 
-    <!-- chimney with steam -->
+    <!-- ═══════════════════════════════════════════════
+         CHIMNEY WITH STEAM PUFFS (continuous)
+         ═══════════════════════════════════════════════ -->
     <g transform="translate(1280, 560)">
+        <!-- brick chimney -->
         <rect x="-25" y="0"  width="50" height="110" fill="#C2185B" stroke="#880E4F" stroke-width="2"/>
         <rect x="-30" y="-8" width="60" height="12"  fill="#880E4F"/>
         <line x1="-25" y1="30" x2="25" y2="30" stroke="#880E4F" stroke-width="1.5"/>
         <line x1="-25" y1="60" x2="25" y2="60" stroke="#880E4F" stroke-width="1.5"/>
         <line x1="-25" y1="90" x2="25" y2="90" stroke="#880E4F" stroke-width="1.5"/>
-        <g><circle cx="0" cy="0" r="18" fill="#ECEFF1"><animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite"/><animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite"/></circle></g>
-        <g><circle cx="0" cy="0" r="18" fill="#ECEFF1"><animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite" begin="-1.3s"/><animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite" begin="-1.3s"/><animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite" begin="-1.3s"/></circle></g>
-        <g><circle cx="0" cy="0" r="18" fill="#ECEFF1"><animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite" begin="-2.6s"/><animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite" begin="-2.6s"/><animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite" begin="-2.6s"/></circle></g>
+
+        <!-- three staggered steam puffs -->
+        <g>
+            <circle cx="0" cy="0" r="18" fill="#ECEFF1">
+                <animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite"/>
+                <animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite"/>
+            </circle>
+        </g>
+        <g>
+            <circle cx="0" cy="0" r="18" fill="#ECEFF1">
+                <animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite" begin="-1.3s"/>
+                <animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite" begin="-1.3s"/>
+                <animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite" begin="-1.3s"/>
+            </circle>
+        </g>
+        <g>
+            <circle cx="0" cy="0" r="18" fill="#ECEFF1">
+                <animate attributeName="cy" values="-10; -140" dur="4s" repeatCount="indefinite" begin="-2.6s"/>
+                <animate attributeName="r"  values="14; 34"  dur="4s" repeatCount="indefinite" begin="-2.6s"/>
+                <animate attributeName="opacity" values="0.9; 0" dur="4s" repeatCount="indefinite" begin="-2.6s"/>
+            </circle>
+        </g>
     </g>
 
-    <!-- bouncing ball -->
+    <!-- ═══════════════════════════════════════════════
+         BOUNCING BALL (continuous)
+         ═══════════════════════════════════════════════ -->
     <g transform="translate(1100, 880)">
         <g>
-            <animateTransform attributeName="transform" type="translate" values="0 0 ; 0 -160 ; 0 0" keyTimes="0; 0.5; 1" calcMode="spline" keySplines="0.3 0 0.3 1 ; 0.7 0 0.7 1" dur="1.6s" repeatCount="indefinite"/>
+            <animateTransform attributeName="transform" type="translate"
+                values="0 0 ; 0 -160 ; 0 0"
+                keyTimes="0; 0.5; 1"
+                calcMode="spline"
+                keySplines="0.3 0 0.3 1 ; 0.7 0 0.7 1"
+                dur="1.6s" repeatCount="indefinite"/>
             <circle r="16" fill="#FF4081" stroke="#AD1457" stroke-width="2"/>
             <circle cx="-5" cy="-5" r="4" fill="rgba(255,255,255,0.75)"/>
         </g>
     </g>
 
-    <!-- bubbles -->
-    <g><circle cx="300" cy="920" r="8" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="11s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="11s" repeatCount="indefinite"/></circle></g>
-    <g><circle cx="720" cy="920" r="10" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="14s" repeatCount="indefinite" begin="-5s"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="14s" repeatCount="indefinite" begin="-5s"/></circle></g>
-    <g><circle cx="1320" cy="920" r="6" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="9s" repeatCount="indefinite" begin="-3s"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="9s" repeatCount="indefinite" begin="-3s"/></circle></g>
-    <g><circle cx="1540" cy="920" r="12" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5"><animate attributeName="cy" values="920; -40" dur="16s" repeatCount="indefinite" begin="-8s"/><animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="16s" repeatCount="indefinite" begin="-8s"/></circle></g>
-
-    <!-- 60s event: hot-air balloon -->
+    <!-- ═══════════════════════════════════════════════
+         FLOATING BUBBLES (continuous, rising & fading)
+         ═══════════════════════════════════════════════ -->
     <g>
-        <animateTransform attributeName="transform" type="translate" values="-120 180 ; -120 180 ; 1720 130 ; 1720 130" keyTimes="0; 0.05; 0.18; 1" dur="60s" repeatCount="indefinite"/>
+        <circle cx="300" cy="920" r="8" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5">
+            <animate attributeName="cy" values="920; -40" dur="11s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="11s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+    <g>
+        <circle cx="720" cy="920" r="10" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5">
+            <animate attributeName="cy" values="920; -40" dur="14s" repeatCount="indefinite" begin="-5s"/>
+            <animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="14s" repeatCount="indefinite" begin="-5s"/>
+        </circle>
+    </g>
+    <g>
+        <circle cx="1320" cy="920" r="6" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5">
+            <animate attributeName="cy" values="920; -40" dur="9s" repeatCount="indefinite" begin="-3s"/>
+            <animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="9s" repeatCount="indefinite" begin="-3s"/>
+        </circle>
+    </g>
+    <g>
+        <circle cx="1540" cy="920" r="12" fill="rgba(100,180,255,0.55)" stroke="rgba(0,100,200,0.5)" stroke-width="1.5">
+            <animate attributeName="cy" values="920; -40" dur="16s" repeatCount="indefinite" begin="-8s"/>
+            <animate attributeName="opacity" values="0; 0.9; 0.9; 0" keyTimes="0; 0.1; 0.8; 1" dur="16s" repeatCount="indefinite" begin="-8s"/>
+        </circle>
+    </g>
+
+    <!-- ═══════════════════════════════════════════════
+         EVENT EVERY 60 SECONDS — hot-air balloon glides
+         across the sky. Visible ~8s per minute.
+         ═══════════════════════════════════════════════ -->
+    <g>
+        <animateTransform attributeName="transform" type="translate"
+            values="-120 180 ; -120 180 ; 1720 130 ; 1720 130"
+            keyTimes="0; 0.05; 0.18; 1"
+            dur="60s" repeatCount="indefinite"/>
         <g>
-            <animateTransform attributeName="transform" type="translate" values="0 0; 0 -10; 0 0" dur="3s" repeatCount="indefinite" additive="sum"/>
+            <!-- gentle up-down bob while flying -->
+            <animateTransform attributeName="transform" type="translate"
+                values="0 0; 0 -10; 0 0" dur="3s" repeatCount="indefinite" additive="sum"/>
             <use href="#gbBalloon"/>
         </g>
     </g>
+
+    <!-- a few sparkles drifting behind the balloon (also 60s cycle) -->
     <g>
-        <animateTransform attributeName="transform" type="translate" values="-80 210 ; -80 210 ; 1700 160 ; 1700 160" keyTimes="0; 0.06; 0.22; 1" dur="60s" repeatCount="indefinite"/>
-        <use href="#gbSparkle"><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="4s" repeatCount="indefinite"/></use>
+        <animateTransform attributeName="transform" type="translate"
+            values="-80 210 ; -80 210 ; 1700 160 ; 1700 160"
+            keyTimes="0; 0.06; 0.22; 1"
+            dur="60s" repeatCount="indefinite"/>
+        <use href="#gbSparkle">
+            <animateTransform attributeName="transform" type="rotate"
+                from="0 0 0" to="360 0 0" dur="4s" repeatCount="indefinite"/>
+        </use>
     </g>
 
-    <!-- 120s event: rocket launch -->
+    <!-- ═══════════════════════════════════════════════
+         EVENT EVERY 120 SECONDS — rocket launches from
+         the bottom-right platform. Visible ~6s of 120s.
+         ═══════════════════════════════════════════════ -->
+
+    <!-- launch pad (static, always visible) -->
     <g transform="translate(1500, 900)">
-        <rect x="-50" y="-8" width="100" height="16" rx="3" fill="#455A64" stroke="#263238" stroke-width="2"/>
-        <rect x="-44" y="8"  width="12" height="22" fill="#263238"/>
-        <rect x="32"  y="8"  width="12" height="22" fill="#263238"/>
-        <line x1="-50" y1="-20" x2="-50" y2="-70" stroke="#263238" stroke-width="3"/>
-        <line x1="50"  y1="-20" x2="50"  y2="-70" stroke="#263238" stroke-width="3"/>
-        <line x1="-50" y1="-70" x2="50"  y2="-70" stroke="#263238" stroke-width="3"/>
+        <rect x="-60" y="-8" width="120" height="16" rx="3" fill="#455A64" stroke="#263238" stroke-width="2"/>
+        <rect x="-54" y="8"  width="14" height="26" fill="#263238"/>
+        <rect x="40"  y="8"  width="14" height="26" fill="#263238"/>
+        <line x1="-60" y1="-20" x2="-60" y2="-85" stroke="#263238" stroke-width="3"/>
+        <line x1="60"  y1="-20" x2="60"  y2="-85" stroke="#263238" stroke-width="3"/>
+        <line x1="-60" y1="-85" x2="60"  y2="-85" stroke="#263238" stroke-width="3"/>
     </g>
-    <!-- T-minus countdown beside the launch pad (120s loop) -->
-    <g transform="translate(1615, 830)">
-        <rect x="-56" y="-40" width="112" height="80" rx="10" fill="#1B1B1B" stroke="#37474F" stroke-width="3"/>
-        <rect x="-50" y="-34" width="100" height="68" rx="6" fill="#0D0D0D"/>
-        <text x="0" y="-14" text-anchor="middle" font-size="11" fill="#FF7043" font-weight="bold" font-family="Arial" letter-spacing="1">T-MINUS</text>
-        <text x="0" y="20" text-anchor="middle" font-size="30" font-weight="bold" fill="#FFB300" font-family="ui-monospace, Menlo, monospace">
-            <!-- 120s launch loop. Display ticks every second during the last 10s,
-                 then "LIFT OFF" for the fraction when the rocket is flying. -->
-            <animate attributeName="fill"
-                values="#FFB300;#FFB300;#FFB300;#FFB300;#FFB300;#FFB300;#FFB300;#FFB300;#FFB300;#FFB300;#FF5252;#FF5252"
-                keyTimes="0;0.9167;0.925;0.9333;0.9417;0.95;0.9583;0.9667;0.975;0.9833;0.9917;1"
-                dur="120s" repeatCount="indefinite"/>
-            <animate attributeName="font-size"
-                values="30;30;30;30;30;30;30;30;30;30;30;22;22"
-                keyTimes="0;0.9167;0.925;0.9333;0.9417;0.95;0.9583;0.9667;0.975;0.9833;0.9917;0.9917;1"
-                dur="120s" repeatCount="indefinite"/>
-            <set attributeName="textContent" to="T-120"/>
-            <animate attributeName="textContent"
-                values="120;119;10;9;8;7;6;5;4;3;2;1;LIFT OFF"
-                keyTimes="0;0.0083;0.9167;0.925;0.9333;0.9417;0.95;0.9583;0.9667;0.975;0.9833;0.9917;1"
-                dur="120s" repeatCount="indefinite"/>
-        </text>
-    </g>
-    <g>
-        <animateTransform attributeName="transform" type="translate" values="1500 870 ; 1500 870 ; 1500 -120" keyTimes="0; 0.9917; 1" dur="120s" repeatCount="indefinite"/>
-        <use href="#gbRocket"/>
-    </g>
-    <g transform="translate(1500, 920)"><circle r="6" fill="#ECEFF1"><animate attributeName="r" values="6; 6; 60" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0; 0.9; 0" keyTimes="0; 0.945; 0.95; 1" dur="120s" repeatCount="indefinite"/></circle></g>
-    <g transform="translate(1460, 925)"><circle r="6" fill="#CFD8DC"><animate attributeName="r" values="6; 6; 40" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0; 0.85; 0" keyTimes="0; 0.945; 0.95; 1" dur="120s" repeatCount="indefinite"/></circle></g>
-    <g transform="translate(1540, 925)"><circle r="6" fill="#CFD8DC"><animate attributeName="r" values="6; 6; 45" keyTimes="0; 0.95; 1" dur="120s" repeatCount="indefinite"/><animate attributeName="opacity" values="0; 0; 0.85; 0" keyTimes="0; 0.945; 0.95; 1" dur="120s" repeatCount="indefinite"/></circle></g>
 
-    <!-- birds -->
+    <!-- T-MINUS countdown display beside the launch pad -->
+    <g transform="translate(1350, 870)">
+        <!-- digital display frame -->
+        <rect x="-72" y="-50" width="144" height="100" rx="12" fill="#1B1B1B" stroke="#37474F" stroke-width="3"/>
+        <rect x="-66" y="-44" width="132" height="86" rx="8" fill="#0D0D0D"/>
+        <!-- bolts in corners -->
+        <circle cx="-64" cy="-42" r="2.5" fill="#546E7A"/>
+        <circle cx="64"  cy="-42" r="2.5" fill="#546E7A"/>
+        <circle cx="-64" cy="42"  r="2.5" fill="#546E7A"/>
+        <circle cx="64"  cy="42"  r="2.5" fill="#546E7A"/>
+        <!-- T-MINUS label -->
+        <text x="0" y="-22" text-anchor="middle" font-size="12" fill="#FF7043" font-weight="bold" font-family="Arial" letter-spacing="2">T-MINUS</text>
+
+        <!-- Countdown: 121 slots (120..0), each ~0.9917s of the 120s cycle.
+             Rocket launches at keyTime 0.991736 when "0" appears. -->
+        <g font-weight="bold" font-family="ui-monospace, Menlo, monospace" text-anchor="middle">
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">120<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.000000;0.000000;0.008264;0.008264;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">119<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.008264;0.008264;0.016529;0.016529;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">118<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.016529;0.016529;0.024793;0.024793;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">117<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.024793;0.024793;0.033058;0.033058;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">116<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.033058;0.033058;0.041322;0.041322;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">115<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.041322;0.041322;0.049587;0.049587;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">114<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.049587;0.049587;0.057851;0.057851;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">113<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.057851;0.057851;0.066116;0.066116;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">112<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.066116;0.066116;0.074380;0.074380;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">111<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.074380;0.074380;0.082645;0.082645;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">110<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.082645;0.082645;0.090909;0.090909;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">109<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.090909;0.090909;0.099174;0.099174;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">108<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.099174;0.099174;0.107438;0.107438;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">107<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.107438;0.107438;0.115702;0.115702;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">106<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.115702;0.115702;0.123967;0.123967;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">105<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.123967;0.123967;0.132231;0.132231;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">104<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.132231;0.132231;0.140496;0.140496;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">103<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.140496;0.140496;0.148760;0.148760;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">102<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.148760;0.148760;0.157025;0.157025;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">101<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.157025;0.157025;0.165289;0.165289;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">100<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.165289;0.165289;0.173554;0.173554;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">99<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.173554;0.173554;0.181818;0.181818;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">98<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.181818;0.181818;0.190083;0.190083;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">97<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.190083;0.190083;0.198347;0.198347;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">96<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.198347;0.198347;0.206612;0.206612;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">95<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.206612;0.206612;0.214876;0.214876;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">94<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.214876;0.214876;0.223140;0.223140;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">93<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.223140;0.223140;0.231405;0.231405;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">92<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.231405;0.231405;0.239669;0.239669;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">91<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.239669;0.239669;0.247934;0.247934;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">90<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.247934;0.247934;0.256198;0.256198;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">89<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.256198;0.256198;0.264463;0.264463;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">88<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.264463;0.264463;0.272727;0.272727;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">87<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.272727;0.272727;0.280992;0.280992;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">86<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.280992;0.280992;0.289256;0.289256;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">85<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.289256;0.289256;0.297521;0.297521;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">84<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.297521;0.297521;0.305785;0.305785;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">83<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.305785;0.305785;0.314050;0.314050;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">82<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.314050;0.314050;0.322314;0.322314;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">81<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.322314;0.322314;0.330579;0.330579;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">80<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.330579;0.330579;0.338843;0.338843;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">79<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.338843;0.338843;0.347107;0.347107;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">78<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.347107;0.347107;0.355372;0.355372;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">77<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.355372;0.355372;0.363636;0.363636;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">76<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.363636;0.363636;0.371901;0.371901;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">75<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.371901;0.371901;0.380165;0.380165;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">74<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.380165;0.380165;0.388430;0.388430;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">73<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.388430;0.388430;0.396694;0.396694;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">72<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.396694;0.396694;0.404959;0.404959;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">71<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.404959;0.404959;0.413223;0.413223;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">70<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.413223;0.413223;0.421488;0.421488;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">69<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.421488;0.421488;0.429752;0.429752;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">68<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.429752;0.429752;0.438017;0.438017;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">67<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.438017;0.438017;0.446281;0.446281;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">66<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.446281;0.446281;0.454545;0.454545;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">65<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.454545;0.454545;0.462810;0.462810;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">64<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.462810;0.462810;0.471074;0.471074;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">63<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.471074;0.471074;0.479339;0.479339;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">62<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.479339;0.479339;0.487603;0.487603;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">61<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.487603;0.487603;0.495868;0.495868;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">60<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.495868;0.495868;0.504132;0.504132;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">59<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.504132;0.504132;0.512397;0.512397;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">58<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.512397;0.512397;0.520661;0.520661;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">57<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.520661;0.520661;0.528926;0.528926;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">56<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.528926;0.528926;0.537190;0.537190;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">55<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.537190;0.537190;0.545455;0.545455;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">54<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.545455;0.545455;0.553719;0.553719;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">53<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.553719;0.553719;0.561983;0.561983;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">52<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.561983;0.561983;0.570248;0.570248;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">51<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.570248;0.570248;0.578512;0.578512;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">50<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.578512;0.578512;0.586777;0.586777;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">49<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.586777;0.586777;0.595041;0.595041;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">48<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.595041;0.595041;0.603306;0.603306;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">47<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.603306;0.603306;0.611570;0.611570;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">46<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.611570;0.611570;0.619835;0.619835;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">45<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.619835;0.619835;0.628099;0.628099;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">44<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.628099;0.628099;0.636364;0.636364;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">43<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.636364;0.636364;0.644628;0.644628;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">42<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.644628;0.644628;0.652893;0.652893;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">41<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.652893;0.652893;0.661157;0.661157;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">40<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.661157;0.661157;0.669421;0.669421;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">39<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.669421;0.669421;0.677686;0.677686;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">38<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.677686;0.677686;0.685950;0.685950;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">37<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.685950;0.685950;0.694215;0.694215;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">36<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.694215;0.694215;0.702479;0.702479;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">35<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.702479;0.702479;0.710744;0.710744;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">34<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.710744;0.710744;0.719008;0.719008;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">33<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.719008;0.719008;0.727273;0.727273;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">32<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.727273;0.727273;0.735537;0.735537;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">31<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.735537;0.735537;0.743802;0.743802;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">30<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.743802;0.743802;0.752066;0.752066;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">29<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.752066;0.752066;0.760331;0.760331;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">28<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.760331;0.760331;0.768595;0.768595;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">27<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.768595;0.768595;0.776860;0.776860;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">26<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.776860;0.776860;0.785124;0.785124;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">25<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.785124;0.785124;0.793388;0.793388;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">24<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.793388;0.793388;0.801653;0.801653;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">23<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.801653;0.801653;0.809917;0.809917;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">22<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.809917;0.809917;0.818182;0.818182;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">21<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.818182;0.818182;0.826446;0.826446;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">20<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.826446;0.826446;0.834711;0.834711;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">19<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.834711;0.834711;0.842975;0.842975;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">18<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.842975;0.842975;0.851240;0.851240;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">17<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.851240;0.851240;0.859504;0.859504;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">16<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.859504;0.859504;0.867769;0.867769;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">15<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.867769;0.867769;0.876033;0.876033;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">14<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.876033;0.876033;0.884298;0.884298;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">13<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.884298;0.884298;0.892562;0.892562;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">12<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.892562;0.892562;0.900826;0.900826;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="32" fill="#FFB300" opacity="0">11<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.900826;0.900826;0.909091;0.909091;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="34" fill="#FF8F00" opacity="0">10<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.909091;0.909091;0.917355;0.917355;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="34" fill="#FF8F00" opacity="0">9<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.917355;0.917355;0.925620;0.925620;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="34" fill="#FF8F00" opacity="0">8<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.925620;0.925620;0.933884;0.933884;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="34" fill="#FF8F00" opacity="0">7<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.933884;0.933884;0.942149;0.942149;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="34" fill="#FF8F00" opacity="0">6<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.942149;0.942149;0.950413;0.950413;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="36" fill="#FF5252" opacity="0">5<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.950413;0.950413;0.958678;0.958678;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="36" fill="#FF5252" opacity="0">4<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.958678;0.958678;0.966942;0.966942;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="40" fill="#FF1744" opacity="0">3<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.966942;0.966942;0.975207;0.975207;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="40" fill="#FF1744" opacity="0">2<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.975207;0.975207;0.983471;0.983471;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="40" fill="#FF1744" opacity="0">1<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.983471;0.983471;0.991736;0.991736;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="22" font-size="40" fill="#FF1744" opacity="0">0<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.991736;0.991736;1.000000;1.000000;1" dur="120s" repeatCount="indefinite"/></text>
+            <text x="0" y="40" font-size="14" fill="#4CAF50" font-weight="bold" opacity="0">LIFT OFF<animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.994215;0.994215;1" dur="120s" repeatCount="indefinite"/></text>
+        </g>
+
+        <!-- blinking red status dot (always pulsing) -->
+        <circle cx="-58" cy="-32" r="3" fill="#E53935">
+            <animate attributeName="opacity" values="1;0.2;1" dur="1s" repeatCount="indefinite"/>
+        </circle>
+        <!-- scanning progress bar at the bottom of the display -->
+        <rect x="-56" y="34" width="112" height="3" fill="#263238"/>
+        <rect x="-56" y="34" width="0" height="3" fill="#4FC3F7">
+            <animate attributeName="width" values="0;112;0" dur="4s" repeatCount="indefinite"/>
+        </rect>
+    </g>
+
+    <!-- ═══════════════════════════════════════════════
+         DRAMATIC ROCKET LAUNCH
+         Launch moment = keyTime 0.991736 (when "0" appears)
+         ═══════════════════════════════════════════════ -->
+
+    <!-- Pre-ignition engine glow: subtle orange pulse at the rocket base
+         during the final seconds of the countdown (keyTime 0.975 onwards) -->
+    <g transform="translate(1500, 890)">
+        <circle r="22" fill="#FF6F00" opacity="0">
+            <animate attributeName="opacity"
+                values="0; 0; 0.3; 0.6; 0.3; 0.8; 0.2; 0.9; 0"
+                keyTimes="0; 0.975; 0.978; 0.982; 0.985; 0.988; 0.990; 0.9917; 1"
+                dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="r"
+                values="10; 10; 14; 18; 16; 22; 28; 38; 50"
+                keyTimes="0; 0.975; 0.978; 0.982; 0.985; 0.988; 0.990; 0.9917; 1"
+                dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+
+    <!-- The rocket (nested groups: outer does launch, inner does shake) -->
     <g>
-        <animateTransform attributeName="transform" type="translate" values="-80 80; 1700 60" dur="40s" repeatCount="indefinite"/>
+        <!-- Outer group: main launch translate. Rocket sits, then blasts off with acceleration. -->
+        <animateTransform attributeName="transform" type="translate"
+            values="1500 855 ; 1500 855 ; 1500 850 ; 1500 820 ; 1500 600 ; 1500 150 ; 1500 -400"
+            keyTimes="0; 0.991736; 0.9925; 0.9935; 0.995; 0.998; 1"
+            calcMode="spline"
+            keySplines="0 0 1 1 ; 0.2 0 0.9 1 ; 0.2 0 0.8 1 ; 0.3 0 0.8 1 ; 0.4 0 0.9 1 ; 0.5 0 1 1"
+            dur="120s" repeatCount="indefinite"/>
+        <g>
+            <!-- Inner group: pre-launch vibration shake (only visible right before launch) -->
+            <animateTransform attributeName="transform" type="translate"
+                values="0 0 ; 0 0 ; 1.5 0 ; -1.5 0 ; 1.5 0 ; -1.5 0 ; 2 0 ; -2 0 ; 2 0 ; -2 0 ; 2.5 0 ; -2.5 0 ; 0 0 ; 0 0"
+                keyTimes="0; 0.975; 0.9775; 0.9800; 0.9825; 0.9850; 0.9875; 0.9895; 0.9905; 0.9910; 0.9913; 0.9915; 0.991736; 1"
+                dur="120s" repeatCount="indefinite"/>
+            <use href="#gbRocket"/>
+        </g>
+    </g>
+
+    <!-- Massive smoke cloud billowing outward at launch (multiple puffs) -->
+    <g transform="translate(1500, 920)">
+        <circle r="6" fill="#ECEFF1" opacity="0">
+            <animate attributeName="r" values="6;6;100" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;1;0" keyTimes="0;0.990;0.991736;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+    <g transform="translate(1430, 925)">
+        <circle r="6" fill="#CFD8DC" opacity="0">
+            <animate attributeName="cx" values="0;0;-80" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="6;6;70" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.95;0" keyTimes="0;0.990;0.991736;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+    <g transform="translate(1570, 925)">
+        <circle r="6" fill="#CFD8DC" opacity="0">
+            <animate attributeName="cx" values="0;0;80" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="6;6;72" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.95;0" keyTimes="0;0.990;0.991736;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+    <g transform="translate(1470, 935)">
+        <circle r="6" fill="#B0BEC5" opacity="0">
+            <animate attributeName="r" values="6;6;55" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.9;0" keyTimes="0;0.9905;0.991736;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+    <g transform="translate(1530, 935)">
+        <circle r="6" fill="#B0BEC5" opacity="0">
+            <animate attributeName="r" values="6;6;58" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.9;0" keyTimes="0;0.9905;0.991736;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+
+    <!-- Shockwave ring expanding outward from launch point -->
+    <g transform="translate(1500, 910)">
+        <circle cx="0" cy="0" r="10" fill="none" stroke="#FFEB3B" stroke-width="4" opacity="0">
+            <animate attributeName="r" values="10;10;220" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="stroke-width" values="4;4;1" keyTimes="0;0.991736;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.9;0" keyTimes="0;0.991736;0.992;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+    <g transform="translate(1500, 910)">
+        <circle cx="0" cy="0" r="10" fill="none" stroke="#FF6F00" stroke-width="3" opacity="0">
+            <animate attributeName="r" values="10;10;180" keyTimes="0;0.992;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.7;0" keyTimes="0;0.992;0.9925;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+
+    <!-- Bright flash at launch moment -->
+    <circle cx="1500" cy="900" r="0" fill="#FFFFFF" opacity="0">
+        <animate attributeName="r" values="0;0;90;0" keyTimes="0;0.991;0.992;0.994" dur="120s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;0;1;0" keyTimes="0;0.991;0.9917;0.994" dur="120s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- Exhaust trail particles streaming behind rising rocket -->
+    <g>
+        <circle cx="1500" cy="900" r="0" fill="#FF7043" opacity="0">
+            <animate attributeName="cy" values="900;900;750" keyTimes="0;0.9935;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="0;0;14;22" keyTimes="0;0.9925;0.9935;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.8;0" keyTimes="0;0.9925;0.9935;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="1500" cy="900" r="0" fill="#FFB300" opacity="0">
+            <animate attributeName="cy" values="900;900;500" keyTimes="0;0.995;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="0;0;18;28" keyTimes="0;0.994;0.995;1" dur="120s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0;0.75;0" keyTimes="0;0.994;0.995;1" dur="120s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+
+    <!-- flock of birds flying by (small, continuous, 40s cycle, fills gaps) -->
+    <g>
+        <animateTransform attributeName="transform" type="translate"
+            values="-80 80; 1700 60" dur="40s" repeatCount="indefinite"/>
         <use href="#gbBird" x="0" y="0"/>
         <use href="#gbBird" x="30" y="12"/>
         <use href="#gbBird" x="60" y="4"/>
     </g>
+
 </svg>
 </div>
 
