@@ -312,6 +312,9 @@
 
 <!-- Lobby Screen (professor) -->
 <div class="screen" id="screen-lobby">
+    <div class="flex items-center mb-12">
+        <button class="btn btn-outline btn-sm" onclick="backToSessions()">&larr; Back to Sessions</button>
+    </div>
     <div class="two-col">
         <div>
             <div class="card">
@@ -963,6 +966,16 @@ async function submitApiKey() {
 async function showSessionsScreen() {
     showScreen('screen-prof-sessions');
     await refreshSessionsList();
+}
+
+// Leave the currently-opened session and return to the sessions list.
+// The session itself stays on the server — this is only a UI navigation.
+async function backToSessions() {
+    try { if (APP.ws) { APP.ws.close(); } } catch (e) {}
+    APP.ws = null;
+    APP.sessionId = null;
+    try { localStorage.removeItem('beer_prof_session'); } catch (e) {}
+    await showSessionsScreen();
 }
 
 async function refreshSessionsList() {
