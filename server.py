@@ -322,8 +322,10 @@ Parameters:
 - Backlog cost: {backlog_cost:.2f} EUR per unit (twice as expensive as holding)
 - Already available = Inventory + Pipeline + Outstanding - Backlog
 
-Respond with your ordering decision.
-Write at the end: ORDER: <number>"""
+IMPORTANT OUTPUT FORMAT:
+- The VERY FIRST line of your reply MUST be exactly: ORDER: <integer>
+- After that line, explain your reasoning in as much detail as you want.
+- Never omit the ORDER line — it is parsed automatically."""
 
 OBJECTIVES = {
     "rational": "Objective: Minimize YOUR OWN cumulative costs only. Other stages are irrelevant to you - optimize exclusively your own inventory and backlog cost balance.",
@@ -341,12 +343,12 @@ async def call_claude(api_key: str, system_prompt: str, user_message: str) -> tu
         }
         body = {
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 512,
+            "max_tokens": 2048,
             "temperature": 0.0,
             "system": system_prompt,
             "messages": [{"role": "user", "content": user_message}],
         }
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             try:
                 resp = await client.post(
                     "https://api.anthropic.com/v1/messages",
@@ -356,12 +358,38 @@ async def call_claude(api_key: str, system_prompt: str, user_message: str) -> tu
                 resp.raise_for_status()
                 data = resp.json()
                 text = data["content"][0]["text"]
-                # Parse ORDER: <number>
-                match = re.search(r"ORDER:\s*(\d+)", text)
-                order = int(match.group(1)) if match else 4
+                # Parse ORDER: <number> — robust fallbacks in case the model
+                # formats slightly differently or output was cut off.
+                order = _parse_order(text)
                 return order, text
             except Exception as e:
                 return 4, f"[AI Error: {e}] Defaulting to order 4."
+
+
+def _parse_order(text: str) -> int:
+    """Extract the order quantity from the model's reply.
+
+    Priority:
+      1. `ORDER: <n>` (case-insensitive, anywhere in the text)
+      2. `order <n>` / `order of <n>` / `ordering <n>` near the start
+      3. Any standalone integer on the first line
+      4. Default: 4 (safe baseline demand)
+    """
+    if not text:
+        return 4
+    m = re.search(r"ORDER\s*[:=]\s*(\d+)", text, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    # Look at the first ~200 chars for any "order <n>" pattern
+    head = text[:400]
+    m = re.search(r"order(?:ing)?(?:\s+of)?\s+(\d+)", head, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    first_line = text.strip().splitlines()[0] if text.strip() else ""
+    m = re.search(r"\b(\d+)\b", first_line)
+    if m:
+        return int(m.group(1))
+    return 4
 
 
 def build_user_message(role: str, round_num: int, rd: dict, history: list[dict]) -> str:

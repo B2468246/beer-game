@@ -601,16 +601,23 @@ textarea { resize: vertical; min-height: 80px; }
 .reasoning-box.open { display: block; }
 
 /* ═══ IMPROVED STRATEGY PICKER ═══ */
+.strategy-options {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
 .strategy-option {
-    border: 2px solid var(--border);
+    border: 2px solid #C9A876;
     border-radius: 14px;
-    padding: 16px 20px;
+    padding: 18px 22px;
     cursor: pointer;
     transition: all 0.25s;
     display: flex;
     align-items: flex-start;
     gap: 14px;
-    background: #FAFAFA;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(93, 64, 28, 0.08);
 }
 
 .strategy-option:hover {
