@@ -9,3 +9,6 @@ game_state.json
 .vscode/
 .idea/
 static/.Rhistory
+
+# macOS-spezifische Shortcut-Dateien (nur lokal auf dem Desktop nützlich)
+*.webloc
