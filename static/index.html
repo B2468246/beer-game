@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=23">
+<link rel="stylesheet" href="/static/style.css?v=24">
 </head>
 <body>
 
@@ -1479,6 +1479,18 @@
     </svg>
     </div>
 
+    <!-- Human Order Input (inline, below simulation) -->
+    <div id="humanOrderPanel" class="card mt-16" style="display:none;border:2px solid var(--accent);background:var(--card)">
+        <div class="flex justify-between items-center mb-12">
+            <h2 id="humanOrderTitle" style="margin:0">Round 1 — Place Your Orders</h2>
+            <button class="btn btn-primary btn-lg" id="humanOrderSubmitBtn" onclick="submitHumanOrders()">Submit Orders</button>
+        </div>
+        <div id="humanOrderForms"></div>
+        <div id="humanOrderWaiting" style="display:none" class="text-muted text-center mt-12">
+            <p>Waiting for other players... <span id="humanOrderProgress"></span></p>
+        </div>
+    </div>
+
     <!-- Round progress -->
     <div class="card mt-16">
         <div class="flex justify-between items-center">
@@ -1597,19 +1609,6 @@
     </div>
 </div>
 
-<!-- Human Order Input Modal -->
-<div class="modal-backdrop" id="humanOrderModal" style="display:none">
-    <div class="modal-card" style="max-width:520px">
-        <h2 id="humanOrderTitle">Round 1 — Place Your Orders</h2>
-        <div id="humanOrderForms"></div>
-        <div class="flex gap-12 mt-16" style="justify-content:flex-end">
-            <button class="btn btn-primary btn-lg" id="humanOrderSubmitBtn" onclick="submitHumanOrders()">Submit Orders</button>
-        </div>
-        <div id="humanOrderWaiting" style="display:none" class="text-muted text-center mt-12">
-            <p>Waiting for other players... <span id="humanOrderProgress"></span></p>
-        </div>
-    </div>
-</div>
 
 <script>
 // ── State ──────────────────────────────────────────────
@@ -1855,7 +1854,7 @@ function handleWSMessage(msg) {
             break;
         case 'round_complete':
             { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = 'none'; }
-            { const m = document.getElementById('humanOrderModal'); if (m) m.style.display = 'none'; }
+            { const m = document.getElementById('humanOrderPanel'); if (m) m.style.display = 'none'; }
             handleRoundComplete(msg);
             break;
         case 'player_unlocked':
@@ -2960,7 +2959,7 @@ function initStudentPlayingFromState(s) {
 
 // ── Human Mode: Order Input ──────────────────────────
 function handleOrderRequest(msg) {
-    const modal = document.getElementById('humanOrderModal');
+    const panel = document.getElementById('humanOrderPanel');
     const title = document.getElementById('humanOrderTitle');
     const forms = document.getElementById('humanOrderForms');
     const submitBtn = document.getElementById('humanOrderSubmitBtn');
@@ -2972,8 +2971,11 @@ function handleOrderRequest(msg) {
     const myRequests = (msg.requests || []).filter(r => r.player_id === APP.playerId);
     if (!myRequests.length) return;
 
+    forms.style.display = 'grid';
+    forms.style.gridTemplateColumns = myRequests.length > 1 ? 'repeat(auto-fit, minmax(220px, 1fr))' : '1fr';
+    forms.style.gap = '12px';
     forms.innerHTML = myRequests.map(r => `
-        <div class="card mb-12" style="background:var(--bg);padding:16px">
+        <div class="card" style="background:var(--bg);padding:16px;margin:0">
             <div class="flex justify-between items-center mb-8">
                 <span class="role-badge ${r.role}" style="font-size:15px">${r.role}</span>
                 <span class="text-muted text-sm">${r.team_name}</span>
@@ -3011,10 +3013,11 @@ function handleOrderRequest(msg) {
 
     submitBtn.style.display = '';
     waiting.style.display = 'none';
-    modal.style.display = '';
+    panel.style.display = '';
 
-    // Focus the first input
+    // Scroll the panel into view and focus first input
     setTimeout(() => {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
         const first = forms.querySelector('.human-order-input');
         if (first) first.focus();
     }, 100);
@@ -3049,11 +3052,11 @@ function handleOrderSubmitted(msg) {
     if (progress) {
         progress.textContent = `(${msg.orders_received} / ${msg.orders_expected})`;
     }
-    // If all orders are in, hide the modal (round_complete will follow)
+    // If all orders are in, hide the panel (round_complete will follow)
     if (msg.orders_received >= msg.orders_expected) {
         setTimeout(() => {
-            const modal = document.getElementById('humanOrderModal');
-            if (modal) modal.style.display = 'none';
+            const p = document.getElementById('humanOrderPanel');
+            if (p) p.style.display = 'none';
         }, 500);
     }
 }
