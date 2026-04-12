@@ -314,21 +314,22 @@ Manufacturer -> Distributor -> Wholesaler -> Retailer -> End Customer.
 Only the Retailer sees actual customer demand. All other stages see only the order from their immediate downstream stage.
 
 Gameplay per week:
-1. You receive goods from your supplier (incoming shipment from orders placed {lead_time} rounds ago).
-2. Your customer places demand. You deliver from inventory. Unfilled demand = backlog.
-3. You place your order with your supplier.
+1. You receive goods from your supplier (shipped by your supplier {lead_time} rounds ago). Note: your supplier can only ship what it has in stock — you may receive LESS than you ordered if your supplier was short.
+2. Your customer places demand. You deliver from inventory. Unfilled demand = backlog (carried to next round).
+3. You place your order with your supplier. Your supplier will try to fulfill it next round from their own inventory.
 
-Rules:
-- Lead time: {lead_time} weeks
-- Pipeline: goods already shipped and on the way to you. Will arrive for sure.
-- Outstanding: ordered but supplier hasn't shipped yet. Will be delivered - do NOT re-order.
+Key concepts:
+- Lead time: {lead_time} weeks (time for shipped goods to reach you)
+- Pipeline: goods already shipped by your supplier, currently in transit. These WILL arrive.
+- Outstanding: you ordered these but your supplier hasn't shipped them yet (supplier was short on stock). They will be shipped as soon as your supplier has inventory — do NOT re-order these.
+- Backlog: demand from your customer that you couldn't fulfill yet. You must fill this from future inventory.
 
 {objective}
 
 Parameters:
-- Holding cost: {holding_cost:.2f} EUR per unit in inventory
-- Backlog cost: {backlog_cost:.2f} EUR per unit (twice as expensive as holding)
-- Already available = Inventory + Pipeline + Outstanding - Backlog
+- Holding cost: {holding_cost:.2f} EUR per unit in inventory per round
+- Backlog cost: {backlog_cost:.2f} EUR per unit per round (twice as expensive as holding)
+- Effective inventory position = Inventory + Pipeline + Outstanding - Backlog
 
 IMPORTANT OUTPUT FORMAT:
 - The VERY FIRST line of your reply MUST be exactly: ORDER: <integer>
@@ -508,7 +509,7 @@ async def run_game():
                         "demand": round_demands[team["id"]][role],
                         "inventory": rs["inventory"] + incoming,
                         "backlog": rs["backlog"],
-                        "pipeline": sum(rs["pipeline"]),
+                        "pipeline": sum(rs["pipeline"][1:]),  # exclude incoming (already in inventory)
                         "outstanding": rs["outstanding"],
                         "incoming_shipment": incoming,
                         "cumulative_cost": rs["cumulative_cost"],
@@ -619,9 +620,8 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             else:
                 demands[role] = settings.get("step_demand_before", 4)
 
-    # ── Step 1: Upstream fulfillment of pending orders from last round ──
-    # Each role tries to ship what downstream ordered last round.
-    # Process upstream→downstream (Manufacturer first, then Distributor, etc.)
+    # ── Step 1: Receive incoming shipments + fulfill downstream demand ──
+    # Each role: (a) receives goods from its pipeline, (b) ships to downstream.
     round_incoming = {}   # role -> incoming shipment this round
     round_shipped = {}    # role -> units shipped to downstream this round
     for role in ROLES:
@@ -1445,7 +1445,8 @@ async def export_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Team", "Role", "Player", "Round", "Demand", "Order",
-                     "Inventory", "Backlog", "Pipeline", "Shipped",
+                     "Inventory", "Backlog", "Pipeline", "Outstanding",
+                     "Incoming Shipment", "Shipped",
                      "Round Cost", "Cumulative Cost"])
     for team in state.get("teams", []):
         tid = team["id"]
@@ -1463,6 +1464,8 @@ async def export_csv():
                     entry.get("inventory", ""),
                     entry.get("backlog", ""),
                     entry.get("pipeline", ""),
+                    entry.get("outstanding", ""),
+                    entry.get("incoming_shipment", ""),
                     entry.get("shipped", ""),
                     f"{entry.get('cost', 0):.2f}",
                     f"{entry.get('cumulative_cost', 0):.2f}",
