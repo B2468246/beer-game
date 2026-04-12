@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=28">
+<link rel="stylesheet" href="/static/style.css?v=29">
 </head>
 <body>
 
@@ -1748,16 +1748,9 @@ function leaveGoneScreen() {
 }
 
 async function bootProfessor() {
-    try {
-        const r = await fetch('/api/api-key').then(r => r.json()).catch(() => ({set:false}));
-        hideBootOverlay();
-        if (!r.set) { showScreen('screen-setup'); return; }
-        // Key already set on server — go straight to sessions list
-        await showSessionsScreen();
-    } catch (e) {
-        hideBootOverlay();
-        showScreen('screen-setup');
-    }
+    hideBootOverlay();
+    // Always show API-key screen first so each professor can enter their own key
+    showScreen('screen-setup');
 }
 
 // ── Screens ────────────────────────────────────────────
