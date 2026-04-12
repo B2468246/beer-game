@@ -4,9 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=21">
+<link rel="stylesheet" href="/static/style.css?v=22">
 </head>
 <body>
+
+<!-- WebSocket reconnection banner -->
+<div id="wsReconnectBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#E74C3C;color:white;text-align:center;padding:10px 16px;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+    <span id="wsReconnectText">Connection lost. Reconnecting...</span>
+</div>
 
 <!-- Animated gear backdrop — only shown on screen-setup (prof API key) and screen-join (student name). -->
 <div id="gearBackdrop" class="gear-backdrop" aria-hidden="true">
@@ -834,9 +839,15 @@
         <h2>Final Results</h2>
         <div id="finalLeaderboard" class="mt-12"></div>
     </div>
+    <div class="card mt-16" id="profBullwhipCard" style="display:none">
+        <h2>📊 Bullwhip Effect</h2>
+        <p class="text-muted text-sm mb-12">Ratio of order variance to demand variance per role. Higher = more amplification.</p>
+        <div id="profBullwhipBody"></div>
+    </div>
     <div class="flex gap-16 mt-20">
         <button class="btn btn-primary" onclick="restartGame()">Restart (Same Teams)</button>
         <button class="btn btn-outline" onclick="newGame()">New Game (Reshuffle)</button>
+        <button class="btn btn-outline" onclick="window.open('/api/export-csv?session_id=' + encodeURIComponent(APP.sessionId || ''), '_blank')">📥 Export CSV</button>
     </div>
 </div>
 
@@ -1539,6 +1550,12 @@
         <div id="studentLeaderboard"></div>
     </div>
 
+    <div class="card mt-16" id="studentBullwhipCard" style="display:none">
+        <h2>📊 Bullwhip Effect</h2>
+        <p class="text-muted text-sm mb-12">Ratio of order variance to demand variance. Higher = more amplification along the supply chain.</p>
+        <div id="studentBullwhipBody"></div>
+    </div>
+
     <!-- Collapsible Team Summary (round-by-round) -->
     <div class="card mt-16" id="studentTeamSummaryCard">
         <div class="flex justify-between items-center" style="cursor:pointer" onclick="toggleStudentTeamSummary()">
@@ -1750,6 +1767,10 @@ function connectWS() {
     try { if (APP.ws) APP.ws.close(); } catch (e) {}
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     APP.ws = new WebSocket(`${proto}://${location.host}/ws?session_id=${encodeURIComponent(APP.sessionId)}`);
+    APP.ws.onopen = () => {
+        const banner = document.getElementById('wsReconnectBanner');
+        if (banner) banner.style.display = 'none';
+    };
     APP.ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         handleWSMessage(msg);
@@ -1764,6 +1785,9 @@ function connectWS() {
                 if (r.status === 404) { handleSessionGone(); return; }
             } catch (e) {}
         }
+        // Show reconnection banner
+        const banner = document.getElementById('wsReconnectBanner');
+        if (banner) banner.style.display = '';
         setTimeout(connectWS, 2000);
     };
 }
@@ -1773,6 +1797,8 @@ function handleWSMessage(msg) {
         case 'error':
             if (msg.message === 'unknown_session') {
                 handleSessionGone();
+            } else if (msg.message === 'no_api_key') {
+                alert('⚠️ ' + (msg.detail || 'No API key set. The professor must enter an Anthropic API key before the game can start.'));
             }
             return;
         case 'player_joined':
@@ -2336,16 +2362,42 @@ function renderPrizes(prizes, containerId, cardId) {
 }
 
 // ── Professor: Results ─────────────────────────────────
+function renderBullwhip(bullwhip, teams, containerId, cardId) {
+    const card = document.getElementById(cardId);
+    const body = document.getElementById(containerId);
+    if (!card || !body || !bullwhip) return;
+    const teamNames = {};
+    (teams || []).forEach(t => { teamNames[t.id] = t.name; });
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="border-bottom:2px solid var(--border)">' +
+        '<th style="text-align:left;padding:8px 6px">Team</th>' +
+        ROLES.map(r => `<th style="text-align:center;padding:8px 6px"><span class="role-badge ${r}">${r}</span></th>`).join('') +
+        '</tr></thead><tbody>';
+    for (const [tid, bw] of Object.entries(bullwhip)) {
+        html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px;font-weight:600">${escapeHtml(teamNames[tid] || tid)}</td>`;
+        ROLES.forEach(r => {
+            const val = bw[r] || 0;
+            const color = val > 2 ? '#E74C3C' : val > 1.2 ? '#E67E22' : '#27AE60';
+            html += `<td style="text-align:center;padding:8px 6px;font-weight:700;color:${color}">${val.toFixed(2)}</td>`;
+        });
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    body.innerHTML = html;
+    card.style.display = '';
+}
+
 function handleGameFinished(msg) {
     if (!APP.isStudent) {
         showScreen('screen-prof-results');
         renderFinalResults(msg.teams);
         renderPrizes(msg.prizes, 'profPrizes', 'profPrizesCard');
+        renderBullwhip(msg.bullwhip, msg.teams, 'profBullwhipBody', 'profBullwhipCard');
     } else {
         // Pre-render the results screen silently so everything is ready
         // behind the peek modal.
         renderStudentResults(msg);
         renderPrizes(msg.prizes, 'studentPrizes', 'studentPrizesCard');
+        renderBullwhip(msg.bullwhip, msg.teams, 'studentBullwhipBody', 'studentBullwhipCard');
         fetchState().then(s => {
             const roleData = (s.rounds_data && APP.teamId) ? s.rounds_data[APP.teamId] : null;
             if (roleData) renderReasoningArchive(roleData);

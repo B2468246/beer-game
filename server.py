@@ -1040,6 +1040,11 @@ async def _begin_game_internal():
     """Core begin logic, callable from /api/begin or auto from lock-in."""
     if state["phase"] != "designing":
         return
+    # Validate API key before starting the game
+    if not api_key_global:
+        await broadcast({"type": "error", "message": "no_api_key",
+                         "detail": "No Anthropic API key set. The professor must enter an API key before the game can start."})
+        return
     state["phase"] = "playing"
     state["demand_sequence"] = generate_demand_sequence(state["settings"])
 
@@ -1129,6 +1134,46 @@ async def kick_all_players():
     save_state()
     await broadcast({"type": "kicked_all"})
     return {"status": "lobby", "kicked": kicked_count}
+
+
+@app.get("/api/export-csv")
+async def export_csv():
+    """Export game results as CSV for professor grading."""
+    import io, csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Team", "Role", "Player", "Round", "Demand", "Order",
+                     "Inventory", "Backlog", "Pipeline", "Shipped",
+                     "Round Cost", "Cumulative Cost"])
+    for team in state.get("teams", []):
+        tid = team["id"]
+        role_map = team.get("role_map", {})
+        rd = state.get("rounds_data", {}).get(tid, {})
+        for role in ROLES:
+            player_name = ""
+            for pid, r in role_map.items():
+                if r == role:
+                    player_name = state["players"].get(pid, {}).get("name", pid)
+                    break
+            for entry in rd.get(role, []):
+                writer.writerow([
+                    team["name"], role, player_name,
+                    entry.get("round", ""),
+                    entry.get("demand", ""),
+                    entry.get("order", ""),
+                    entry.get("inventory", ""),
+                    entry.get("backlog", ""),
+                    entry.get("pipeline", ""),
+                    entry.get("shipped", ""),
+                    f"{entry.get('cost', 0):.2f}",
+                    f"{entry.get('cumulative_cost', 0):.2f}",
+                ])
+    from starlette.responses import Response
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=beer_game_results.csv"},
+    )
 
 
 def _team_id_for_player(player_id: str) -> Optional[str]:
