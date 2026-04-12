@@ -614,6 +614,8 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             "inventory": rs["inventory"],
             "backlog": rs["backlog"],
             "pipeline": sum(rs["pipeline"]),
+            "pipeline_detail": list(rs["pipeline"]),
+            "shipped": shipped,
             "outstanding": rs["outstanding"],
             "order": order,
             "cost": round_cost,

@@ -290,15 +290,20 @@ textarea { resize: vertical; min-height: 80px; }
    GAME BOARD — empty, ready for fresh design
    ════════════════════════════════════════════════════════ */
 
-/* 16:9 game board container */
+/* Game board container — Z-layout (1800x1000 SVG) */
 .game-board {
     position: relative;
     width: 100%;
-    aspect-ratio: 16 / 9;
-    background: linear-gradient(180deg, #D5E8D4 0%, #B5D6A7 40%, #97C987 100%);
-    border-radius: 16px;
+    aspect-ratio: 9 / 5;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 30%, #EFFAE6 0%, transparent 70%),
+      linear-gradient(180deg, #B6E2A1 0%, #8FCC7B 55%, #65AE57 100%);
+    border-radius: 28px;
     overflow: hidden;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.12), inset 0 1px 6px rgba(255,255,255,0.3);
+    box-shadow:
+      0 22px 60px rgba(40, 60, 30, 0.28),
+      0 3px 10px rgba(40, 60, 30, 0.12),
+      inset 0 0 0 1px rgba(255,255,255,0.6);
 }
 
 .game-board svg {
@@ -455,6 +460,57 @@ textarea { resize: vertical; min-height: 80px; }
 @keyframes bubbleIn {
     from { opacity: 0; transform: translateY(8px) scale(0.95); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ═══ Z3f GAME BOARD INFO CARDS & LABELS ═══ */
+
+.info-card {
+    box-sizing: border-box;
+    background: rgba(255,255,255,0.96);
+    border: 1.5px solid #C9B889;
+    border-radius: 14px;
+    padding: 10px 13px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: #1C2633;
+    line-height: 1.45;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+    backdrop-filter: blur(3px);
+}
+.info-card .role {
+    font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px;
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    color: white; margin-bottom: 6px;
+}
+.info-card .role.Retailer    { background: #FF7043; }
+.info-card .role.Wholesaler  { background: #66BB6A; }
+.info-card .role.Distributor { background: #42A5F5; }
+.info-card .role.Factory,
+.info-card .role.Manufacturer { background: #AB47BC; }
+.info-card .row { display: flex; justify-content: space-between; padding: 2px 0; }
+.info-card .row .label { color: #5F6E7D; }
+.info-card .row .val   { font-weight: 700; font-variant-numeric: tabular-nums; }
+.info-card .row.cost .val { color: #C8651A; }
+.info-card .row.bl .val[data-warn="1"] { color: #C0392B; }
+.info-card .divider { height: 1px; background: #EADFC0; margin: 5px 0; }
+
+.station-label {
+    font-family: inherit; font-size: 15px; font-weight: 800;
+    fill: #1C2633; text-anchor: middle;
+    paint-order: stroke; stroke: white; stroke-width: 3px; stroke-linejoin: round;
+}
+.station-label .player { font-weight: 500; fill: #5F6E7D; font-size: 12px; }
+
+.truck-label-bg {
+    fill: white; stroke: #C9B889; stroke-width: 1;
+}
+.truck-label {
+    fill: #1F2D3A; font-size: 12px; font-weight: 800;
+    text-anchor: middle; font-family: inherit;
+}
+
+.week-badge-g text {
+    font-family: inherit;
 }
 
 /* ═══ CHARTS ═══ */

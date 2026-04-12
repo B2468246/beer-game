@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=17">
+<link rel="stylesheet" href="/static/style.css?v=18">
 </head>
 <body>
 
@@ -901,7 +901,562 @@
     <!-- Game Board — 16:9 SVG canvas -->
     <div class="game-board" id="gameBoard">
         <button class="fullscreen-btn" onclick="toggleFullscreen()">&#x26F6; Fullscreen</button>
-        <svg id="gameSvg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg id="gameSvg" viewBox="0 0 1800 1000" preserveAspectRatio="xMidYMid meet">
+
+      <!-- ═══ DEFS ══════════════════════════════════════ -->
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0"   stop-color="#EDF9E4"/>
+          <stop offset="0.6" stop-color="#C5E4A8" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="lake" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#A8DAEA"/>
+          <stop offset="1" stop-color="#5EA4C0"/>
+        </radialGradient>
+        <linearGradient id="roadGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0"   stop-color="#566371"/>
+          <stop offset="0.4" stop-color="#3F4A56"/>
+          <stop offset="1"   stop-color="#2C343D"/>
+        </linearGradient>
+        <linearGradient id="stoneGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#D4C4A0"/>
+          <stop offset="1" stop-color="#9C8B68"/>
+        </linearGradient>
+        <linearGradient id="factoryWall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#F1DBF3"/>
+          <stop offset="1" stop-color="#D6A6DC"/>
+        </linearGradient>
+        <linearGradient id="distWall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#E1F0FB"/>
+          <stop offset="1" stop-color="#A8D0ED"/>
+        </linearGradient>
+        <linearGradient id="wholeWall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#E5F6E3"/>
+          <stop offset="1" stop-color="#A6D69F"/>
+        </linearGradient>
+        <linearGradient id="retailWall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFF0DE"/>
+          <stop offset="1" stop-color="#F2CB97"/>
+        </linearGradient>
+
+        <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-opacity="0.22"/>
+        </filter>
+        <filter id="truckShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-opacity="0.35"/>
+        </filter>
+        <filter id="villageShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.18"/>
+        </filter>
+
+        <pattern id="tiles" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+          <rect width="20" height="20" fill="#C0392B"/>
+          <path d="M 0 10 h 20 M 0 20 h 20 M 10 0 v 10 M 0 10 v 10" stroke="#7F1D10" stroke-width="0.6"/>
+        </pattern>
+        <pattern id="cobble" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+          <rect width="14" height="14" fill="#B8A78A"/>
+          <path d="M 0 7 h 14 M 7 0 v 7 M 0 14 h 14 M 0 7 v 7" stroke="#6B5635" stroke-width="0.5" opacity="0.6"/>
+        </pattern>
+
+        <symbol id="tree" viewBox="-24 -44 48 56">
+          <ellipse cx="0" cy="10" rx="16" ry="3.5" fill="#000" opacity="0.18"/>
+          <rect x="-2.5" y="-4" width="5" height="14" rx="1" fill="#6B4A2B"/>
+          <circle cx="0"  cy="-20" r="16" fill="#3E8E41"/>
+          <circle cx="-10" cy="-10" r="12" fill="#4CA14F"/>
+          <circle cx="10"  cy="-12" r="12" fill="#4CA14F"/>
+          <circle cx="0"   cy="-28" r="10" fill="#5BB85E"/>
+          <circle cx="-5"  cy="-18" r="3"  fill="#2C6E30" opacity="0.5"/>
+          <circle cx="6"   cy="-22" r="2.5" fill="#2C6E30" opacity="0.5"/>
+        </symbol>
+        <symbol id="pine" viewBox="-20 -48 40 56">
+          <ellipse cx="0" cy="6" rx="13" ry="3" fill="#000" opacity="0.18"/>
+          <rect x="-2" y="-2" width="4" height="10" fill="#6B4A2B"/>
+          <polygon points="-14,-4 14,-4 0,-20" fill="#2E7D32"/>
+          <polygon points="-12,-16 12,-16 0,-30" fill="#388E3C"/>
+          <polygon points="-9,-26 9,-26 0,-42" fill="#43A047"/>
+        </symbol>
+        <symbol id="z3fCloud" viewBox="-44 -14 88 28">
+          <ellipse cx="-22" cy="4"  rx="18" ry="9"  fill="#fff" opacity="0.78"/>
+          <ellipse cx="-4"  cy="-2" rx="20" ry="11" fill="#fff" opacity="0.9"/>
+          <ellipse cx="16"  cy="4"  rx="16" ry="8"  fill="#fff" opacity="0.78"/>
+        </symbol>
+
+        <!-- TRUCK pointing RIGHT (+X) -->
+        <symbol id="truck" viewBox="-40 -28 80 50">
+          <ellipse cx="0" cy="16" rx="38" ry="3.5" fill="#000" opacity="0.24"/>
+          <rect x="-36" y="-8" width="48" height="20" rx="2"
+                fill="#F1E1BE" stroke="#7B5B2B" stroke-width="1.3"/>
+          <line x1="-26" y1="-8" x2="-26" y2="12" stroke="#7B5B2B" stroke-width="0.9"/>
+          <line x1="-16" y1="-8" x2="-16" y2="12" stroke="#7B5B2B" stroke-width="0.9"/>
+          <line x1="-6"  y1="-8" x2="-6"  y2="12" stroke="#7B5B2B" stroke-width="0.9"/>
+          <line x1="4"   y1="-8" x2="4"   y2="12" stroke="#7B5B2B" stroke-width="0.9"/>
+          <rect x="-34" y="-17" width="10" height="9" rx="1.2" fill="#C8651A" stroke="#6A2E05" stroke-width="0.6"/>
+          <rect x="-23" y="-17" width="10" height="9" rx="1.2" fill="#D4A24C" stroke="#7A5418" stroke-width="0.6"/>
+          <rect x="-12" y="-17" width="10" height="9" rx="1.2" fill="#C8651A" stroke="#6A2E05" stroke-width="0.6"/>
+          <rect x="-1"  y="-17" width="10" height="9" rx="1.2" fill="#D4A24C" stroke="#7A5418" stroke-width="0.6"/>
+          <path d="M 12,-8 L 24,-8 L 30,0 L 30,12 L 12,12 Z"
+                fill="#E67E22" stroke="#7B2F06" stroke-width="1.3"/>
+          <rect x="15" y="-4" width="11" height="8" rx="1" fill="#B3E5FC" stroke="#3F7799" stroke-width="0.7"/>
+          <rect x="28" y="3" width="2" height="7" fill="#3A1807"/>
+          <rect x="29" y="8" width="2" height="2.5" fill="#FFF3B8"/>
+          <g fill="#1A1A1A">
+            <circle cx="-24" cy="14" r="4.6"/>
+            <circle cx="-6"  cy="14" r="4.6"/>
+            <circle cx="22"  cy="14" r="4.6"/>
+          </g>
+          <g fill="#888">
+            <circle cx="-24" cy="14" r="1.8"/>
+            <circle cx="-6"  cy="14" r="1.8"/>
+            <circle cx="22"  cy="14" r="1.8"/>
+          </g>
+        </symbol>
+
+        <symbol id="customerSym" viewBox="-22 -46 44 56">
+          <ellipse cx="0" cy="8" rx="14" ry="3" fill="#000" opacity="0.2"/>
+          <circle cx="0" cy="-32" r="8" fill="#F2CBA1"/>
+          <rect x="-2" y="-25" width="4" height="4" fill="#A8683D"/>
+          <path d="M -12,-20 Q 0,-24 12,-20 L 12,4 Q 0,8 -12,4 Z" fill="#4B6EA8"/>
+          <rect x="-5" y="4" width="4" height="10" fill="#2C3E50"/>
+          <rect x="1"  y="4" width="4" height="10" fill="#2C3E50"/>
+          <rect x="10" y="-12" width="9" height="11" fill="#C8651A" stroke="#6A2E05" stroke-width="0.8"/>
+          <path d="M 11,-12 Q 14,-17 18,-12" stroke="#6A2E05" stroke-width="0.8" fill="none"/>
+          <rect x="12" y="-9" width="5" height="3" fill="#D4A24C"/>
+        </symbol>
+
+        <!-- Village house -->
+        <symbol id="house" viewBox="-30 -36 60 50">
+          <ellipse cx="0" cy="14" rx="26" ry="3" fill="#000" opacity="0.20"/>
+          <rect x="-22" y="-4" width="44" height="18" fill="#FBE6C2" stroke="#8B5E2B" stroke-width="1.2"/>
+          <polygon points="-26,-4 0,-26 26,-4" fill="currentColor" stroke="#5A2A12" stroke-width="1.2"/>
+          <polygon points="-26,-4 0,-26 -2,-26 -24,-2" fill="#fff" opacity="0.18"/>
+          <rect x="-16" y="2" width="9" height="9" fill="#B3E5FC" stroke="#5A2A12" stroke-width="0.8"/>
+          <line x1="-11.5" y1="2" x2="-11.5" y2="11" stroke="#5A2A12" stroke-width="0.6"/>
+          <line x1="-16" y1="6.5" x2="-7" y2="6.5" stroke="#5A2A12" stroke-width="0.6"/>
+          <rect x="2" y="0" width="10" height="14" fill="#7B4A22" stroke="#3F2510" stroke-width="0.8"/>
+          <circle cx="10" cy="8" r="0.8" fill="#FFD700"/>
+          <rect x="6" y="-22" width="3" height="10" fill="#8B5E2B"/>
+          <rect x="5" y="-23" width="5" height="3" fill="#5A2A12"/>
+        </symbol>
+
+        <!-- Village church -->
+        <symbol id="church" viewBox="-36 -56 72 70">
+          <ellipse cx="0" cy="14" rx="32" ry="4" fill="#000" opacity="0.22"/>
+          <rect x="-26" y="-12" width="52" height="26" fill="#FFF6E2" stroke="#7A5530" stroke-width="1.2"/>
+          <polygon points="-30,-12 0,-32 30,-12" fill="#8B3A1F" stroke="#3F1A0A" stroke-width="1.2"/>
+          <rect x="-8" y="-46" width="16" height="34" fill="#FFF6E2" stroke="#7A5530" stroke-width="1.2"/>
+          <polygon points="-10,-46 0,-58 10,-46" fill="#8B3A1F" stroke="#3F1A0A" stroke-width="1.2"/>
+          <rect x="-2" y="-58" width="2" height="6" fill="#5A2A12"/>
+          <path d="M -3,-56 L 3,-56 M 0,-58 L 0,-50" stroke="#FFD700" stroke-width="1.4"/>
+          <path d="M -5,-40 Q 0,-46 5,-40 L 5,-32 L -5,-32 Z" fill="#3F1A0A"/>
+          <path d="M -5,4 L -5,-4 Q 0,-10 5,-4 L 5,4 L 5,14 L -5,14 Z" fill="#5A2A12" stroke="#3F1A0A" stroke-width="0.8"/>
+          <circle cx="3" cy="6" r="0.6" fill="#FFD700"/>
+          <path d="M -20,2 Q -16,-4 -12,2 L -12,8 L -20,8 Z" fill="#B3E5FC" stroke="#7A5530" stroke-width="0.7"/>
+          <path d="M  12,2 Q 16,-4 20,2 L 20,8 L 12,8 Z" fill="#B3E5FC" stroke="#7A5530" stroke-width="0.7"/>
+        </symbol>
+
+        <!-- Windmill -->
+        <symbol id="windmill" viewBox="-26 -56 52 66">
+          <ellipse cx="0" cy="10" rx="22" ry="3" fill="#000" opacity="0.20"/>
+          <polygon points="-14,10 14,10 10,-30 -10,-30" fill="#E8DCC0" stroke="#5A2A12" stroke-width="1.2"/>
+          <line x1="-12" y1="-12" x2="12" y2="-12" stroke="#5A2A12" stroke-width="0.7"/>
+          <line x1="-13" y1="0"   x2="13" y2="0"   stroke="#5A2A12" stroke-width="0.7"/>
+          <rect x="-4" y="-4" width="8" height="14" fill="#7B4A22" stroke="#3F2510" stroke-width="0.8"/>
+          <polygon points="-12,-30 12,-30 0,-44" fill="#8B3A1F" stroke="#3F1A0A" stroke-width="1.2"/>
+          <circle cx="0" cy="-30" r="2.5" fill="#3F1A0A"/>
+          <g transform-origin="0 -30">
+            <g>
+              <rect x="-1" y="-30" width="2" height="22" fill="#FAF0D8" stroke="#5A2A12" stroke-width="0.6"/>
+              <rect x="-1" y="-52" width="2" height="22" fill="#FAF0D8" stroke="#5A2A12" stroke-width="0.6"/>
+              <rect x="-22" y="-31" width="22" height="2" fill="#FAF0D8" stroke="#5A2A12" stroke-width="0.6"/>
+              <rect x="0"   y="-31" width="22" height="2" fill="#FAF0D8" stroke="#5A2A12" stroke-width="0.6"/>
+              <animateTransform attributeName="transform" type="rotate"
+                                from="0 0 -30" to="360 0 -30" dur="14s" repeatCount="indefinite"/>
+            </g>
+          </g>
+        </symbol>
+      </defs>
+
+      <!-- ═══ BACKDROP ══════════════════════════════════ -->
+      <rect x="0" y="0" width="1800" height="1000" fill="url(#sky)"/>
+
+      <!-- ═══ MOUNTAINS ═══ -->
+      <g id="mountains" opacity="0.35">
+        <polygon points="0,220 120,80 260,160 380,50 500,140 620,30 740,120 860,180 900,100 1000,160 1100,60 1200,140 1340,90 1460,150 1560,40 1680,120 1800,80 1800,280 0,280"
+                 fill="#8BAEB8" opacity="0.5"/>
+        <polygon points="0,260 80,160 180,210 300,120 420,190 520,110 640,180 720,130 820,200 900,140 1020,190 1120,120 1240,180 1360,130 1480,190 1580,110 1700,180 1800,140 1800,310 0,310"
+                 fill="#7A9E7A" opacity="0.55"/>
+        <polygon points="0,290 100,200 200,250 320,180 440,240 540,190 660,250 760,210 860,260 960,200 1060,250 1160,190 1280,250 1400,210 1520,260 1620,200 1740,250 1800,220 1800,340 0,340"
+                 fill="#5C8A5C" opacity="0.45"/>
+        <g fill="white" opacity="0.6">
+          <polygon points="380,50 360,80 400,80"/>
+          <polygon points="620,30 596,66 644,66"/>
+          <polygon points="1100,60 1078,92 1122,92"/>
+          <polygon points="1560,40 1536,74 1584,74"/>
+        </g>
+      </g>
+
+      <!-- subtle grass shadings -->
+      <ellipse cx="900" cy="530" rx="500" ry="70" fill="#2C6E30" opacity="0.08"/>
+      <ellipse cx="300" cy="950" rx="260" ry="18" fill="#2C6E30" opacity="0.10"/>
+      <ellipse cx="1500" cy="960" rx="260" ry="18" fill="#2C6E30" opacity="0.10"/>
+
+      <!-- LAKE -->
+      <g id="lake-group">
+        <ellipse cx="900" cy="540" rx="200" ry="44" fill="url(#lake)" opacity="0.92"/>
+        <ellipse cx="900" cy="534" rx="150" ry="22" fill="#fff" opacity="0.20"/>
+        <g stroke="#fff" stroke-width="1.4" fill="none" opacity="0.55">
+          <path d="M 780,540 q 12,-4 24,0 t 24,0"/>
+          <path d="M 840,560 q 14,-4 28,0 t 28,0"/>
+          <path d="M 920,548 q 14,-4 28,0 t 28,0"/>
+          <path d="M 970,565 q 12,-4 24,0 t 24,0"/>
+          <path d="M 800,520 q 10,-3 20,0 t 20,0" opacity="0.7"/>
+          <path d="M 1000,532 q 10,-3 20,0 t 20,0" opacity="0.7"/>
+        </g>
+        <g>
+          <ellipse cx="755" cy="545" rx="9" ry="4" fill="#3E8E41"/>
+          <circle  cx="757" cy="544" r="1.2" fill="#FFE4F1"/>
+          <ellipse cx="1042" cy="538" rx="9" ry="4" fill="#3E8E41"/>
+          <circle  cx="1044" cy="537" r="1.2" fill="#FFE4F1"/>
+          <ellipse cx="980" cy="558" rx="7" ry="3" fill="#3E8E41"/>
+        </g>
+      </g>
+
+      <!-- clouds -->
+      <use href="#z3fCloud" x="180"  y="60"  width="170" height="55"/>
+      <use href="#z3fCloud" x="780"  y="40"  width="200" height="62"/>
+      <use href="#z3fCloud" x="1440" y="80"  width="170" height="55"/>
+
+      <!-- background trees -->
+      <g id="trees-back">
+        <use href="#tree" x="70"   y="180" width="60" height="80"/>
+        <use href="#pine" x="150"  y="160" width="52" height="76"/>
+        <use href="#tree" x="900"  y="160" width="62" height="82"/>
+        <use href="#pine" x="60"   y="520" width="50" height="74"/>
+        <use href="#tree" x="80"   y="880" width="60" height="80"/>
+        <use href="#pine" x="700"  y="920" width="48" height="70"/>
+        <use href="#tree" x="1000" y="920" width="58" height="78"/>
+        <circle cx="540"  cy="640" r="12" fill="#4CA14F"/>
+        <circle cx="1260" cy="420" r="12" fill="#4CA14F"/>
+        <circle cx="630"  cy="460" r="9"  fill="#5BB85E"/>
+        <circle cx="1170" cy="620" r="9"  fill="#5BB85E"/>
+      </g>
+
+      <!-- ═══ VILLAGE ═══ -->
+      <g id="village" filter="url(#villageShadow)">
+        <ellipse cx="1660" cy="540" rx="160" ry="100" fill="#7BC36C" opacity="0.55"/>
+        <path d="M 1540,560 Q 1620,520 1700,560 T 1790,520"
+              stroke="url(#cobble)" stroke-width="14" stroke-linecap="round" fill="none"/>
+        <g stroke="#8B5E2B" stroke-width="1.4">
+          <line x1="1540" y1="610" x2="1620" y2="615"/>
+          <line x1="1620" y1="615" x2="1700" y2="618"/>
+          <line x1="1700" y1="618" x2="1780" y2="612"/>
+          <g fill="#8B5E2B">
+            <rect x="1545" y="604" width="2" height="14"/>
+            <rect x="1565" y="604" width="2" height="14"/>
+            <rect x="1585" y="606" width="2" height="14"/>
+            <rect x="1605" y="608" width="2" height="14"/>
+            <rect x="1625" y="610" width="2" height="14"/>
+            <rect x="1645" y="612" width="2" height="14"/>
+            <rect x="1665" y="613" width="2" height="14"/>
+            <rect x="1685" y="614" width="2" height="14"/>
+            <rect x="1705" y="614" width="2" height="14"/>
+            <rect x="1725" y="612" width="2" height="14"/>
+            <rect x="1745" y="610" width="2" height="14"/>
+            <rect x="1765" y="608" width="2" height="14"/>
+          </g>
+        </g>
+        <g style="color:#C0392B"><use href="#house" x="1520" y="490" width="60" height="50"/></g>
+        <g style="color:#3F7799"><use href="#house" x="1590" y="475" width="60" height="50"/></g>
+        <g style="color:#A0691F"><use href="#house" x="1670" y="495" width="60" height="50"/></g>
+        <g style="color:#4F8B41"><use href="#house" x="1745" y="480" width="60" height="50"/></g>
+        <use href="#church"   x="1700" y="380" width="80" height="80"/>
+        <use href="#windmill" x="1540" y="400" width="60" height="80"/>
+        <use href="#tree" x="1605" y="550" width="40" height="55"/>
+        <use href="#pine" x="1755" y="540" width="36" height="55"/>
+        <use href="#tree" x="1530" y="555" width="38" height="50"/>
+        <g transform="translate(1668,565)">
+          <ellipse cx="0" cy="6" rx="9" ry="3" fill="#5C5C5C"/>
+          <circle cx="0" cy="0" r="7" fill="#9E8B66" stroke="#5A4225" stroke-width="1"/>
+          <circle cx="0" cy="0" r="4.5" fill="#3F2510"/>
+          <rect x="-7" y="-12" width="1.6" height="14" fill="#7A5530"/>
+          <rect x="5.4" y="-12" width="1.6" height="14" fill="#7A5530"/>
+          <polygon points="-9,-12 9,-12 6,-16 -6,-16" fill="#8B3A1F"/>
+        </g>
+      </g>
+
+      <!-- ═══ BRIDGE SUBSTRUCTURE ═══ -->
+      <g id="bridge-sub">
+        <g transform="translate(900,478) rotate(-22.47)">
+          <rect x="-160" y="-2" width="320" height="22" fill="url(#stoneGrad)" stroke="#6B5635" stroke-width="1.4"/>
+          <g stroke="#6B5635" stroke-width="0.6" opacity="0.7">
+            <line x1="-128" y1="-2" x2="-128" y2="20"/>
+            <line x1="-96"  y1="-2" x2="-96"  y2="20"/>
+            <line x1="-64"  y1="-2" x2="-64"  y2="20"/>
+            <line x1="-32"  y1="-2" x2="-32"  y2="20"/>
+            <line x1="0"    y1="-2" x2="0"    y2="20"/>
+            <line x1="32"   y1="-2" x2="32"   y2="20"/>
+            <line x1="64"   y1="-2" x2="64"   y2="20"/>
+            <line x1="96"   y1="-2" x2="96"   y2="20"/>
+            <line x1="128"  y1="-2" x2="128"  y2="20"/>
+          </g>
+          <path d="M -110,20 Q -80,4 -50,20" fill="none" stroke="#6B5635" stroke-width="1.6"/>
+          <path d="M -25,20  Q 0,4 25,20"    fill="none" stroke="#6B5635" stroke-width="1.6"/>
+          <path d="M 50,20   Q 80,4 110,20"  fill="none" stroke="#6B5635" stroke-width="1.6"/>
+        </g>
+        <g fill="url(#stoneGrad)" stroke="#5C4A2C" stroke-width="1.3">
+          <rect x="840" y="508" width="16" height="66" rx="1"/>
+          <rect x="905" y="482" width="16" height="90" rx="1"/>
+          <rect x="970" y="456" width="16" height="116" rx="1"/>
+        </g>
+        <g fill="#3F6479" opacity="0.6">
+          <ellipse cx="848" cy="576" rx="14" ry="2.5"/>
+          <ellipse cx="913" cy="574" rx="14" ry="2.5"/>
+          <ellipse cx="978" cy="574" rx="14" ry="2.5"/>
+        </g>
+      </g>
+
+      <!-- ═══ ROADS (Z-layout) ═══ -->
+      <g id="roads">
+        <!-- Seg 0: Factory -> Distributor (bottom horizontal) -->
+        <path id="segPath-0" d="M 1420,780 L 380,780"
+              stroke="url(#roadGrad)" stroke-width="62" fill="none"/>
+        <path d="M 1420,780 L 380,780"
+              stroke="#2C343D" stroke-width="70" fill="none" opacity="0.22"/>
+        <path d="M 1420,780 L 380,780"
+              stroke="#F4C64C" stroke-width="3.5" stroke-linecap="round"
+              stroke-dasharray="16 18" fill="none"/>
+
+        <!-- Seg 1: Distributor -> Wholesaler (curve + diagonal + curve) -->
+        <path id="segPath-1" d="M 380,780 C 380,720 400,690 460,660 L 1340,296 C 1390,306 1420,295 1420,280"
+              stroke="url(#roadGrad)" stroke-width="62" fill="none"/>
+        <path d="M 380,780 C 380,720 400,690 460,660 L 1340,296 C 1390,306 1420,295 1420,280"
+              stroke="#2C343D" stroke-width="70" fill="none" opacity="0.22"/>
+        <path d="M 380,780 C 380,720 400,690 460,660 L 1340,296 C 1390,306 1420,295 1420,280"
+              stroke="#F4C64C" stroke-width="3.5" stroke-linecap="round"
+              stroke-dasharray="16 18" fill="none"/>
+
+        <!-- Seg 2: Wholesaler -> Retailer (top horizontal) -->
+        <path id="segPath-2" d="M 1420,280 L 380,280"
+              stroke="url(#roadGrad)" stroke-width="62" fill="none"/>
+        <path d="M 1420,280 L 380,280"
+              stroke="#2C343D" stroke-width="70" fill="none" opacity="0.22"/>
+        <path d="M 1420,280 L 380,280"
+              stroke="#F4C64C" stroke-width="3.5" stroke-linecap="round"
+              stroke-dasharray="16 18" fill="none"/>
+
+        <!-- Seg 3: Retailer -> Customer (curve out) -->
+        <path id="segPath-3" d="M 380,280 C 330,310 270,360 170,420"
+              stroke="url(#roadGrad)" stroke-width="42" fill="none"/>
+        <path d="M 380,280 C 330,310 270,360 170,420"
+              stroke="#F4C64C" stroke-width="2.5" stroke-linecap="round"
+              stroke-dasharray="10 12" fill="none"/>
+      </g>
+
+      <!-- ═══ BRIDGE SUPERSTRUCTURE ═══ -->
+      <g id="bridge-sup">
+        <line x1="754" y1="499" x2="1018" y2="390"
+              stroke="#E8DCC0" stroke-width="6" stroke-linecap="round"/>
+        <line x1="754" y1="499" x2="1018" y2="390"
+              stroke="#7B5B2B" stroke-width="6" stroke-linecap="round" opacity="0.25"/>
+        <g stroke="#7B5B2B" stroke-width="2.8" stroke-linecap="round">
+          <line x1="754" y1="499" x2="751" y2="492"/>
+          <line x1="787" y1="486" x2="784" y2="478"/>
+          <line x1="820" y1="472" x2="817" y2="465"/>
+          <line x1="853" y1="458" x2="850" y2="451"/>
+          <line x1="886" y1="445" x2="883" y2="437"/>
+          <line x1="919" y1="431" x2="916" y2="424"/>
+          <line x1="952" y1="417" x2="949" y2="410"/>
+          <line x1="985" y1="404" x2="982" y2="396"/>
+          <line x1="1018" y1="390" x2="1015" y2="383"/>
+        </g>
+        <line x1="782" y1="566" x2="1046" y2="457"
+              stroke="#E8DCC0" stroke-width="6" stroke-linecap="round"/>
+        <line x1="782" y1="566" x2="1046" y2="457"
+              stroke="#7B5B2B" stroke-width="6" stroke-linecap="round" opacity="0.25"/>
+        <g stroke="#7B5B2B" stroke-width="2.8" stroke-linecap="round">
+          <line x1="782" y1="566" x2="785" y2="573"/>
+          <line x1="815" y1="552" x2="818" y2="560"/>
+          <line x1="848" y1="539" x2="851" y2="546"/>
+          <line x1="881" y1="525" x2="884" y2="532"/>
+          <line x1="914" y1="511" x2="917" y2="519"/>
+          <line x1="947" y1="498" x2="950" y2="505"/>
+          <line x1="980" y1="484" x2="983" y2="491"/>
+          <line x1="1013" y1="470" x2="1016" y2="478"/>
+          <line x1="1046" y1="457" x2="1049" y2="464"/>
+        </g>
+      </g>
+
+      <!-- ═══ BUILDINGS ═══ -->
+
+      <!-- RETAILER (top-left, 380,280) -->
+      <g id="building-Retailer" transform="translate(380,280)" filter="url(#softShadow)">
+        <ellipse cx="0" cy="92" rx="110" ry="10" fill="#000" opacity="0.18"/>
+        <polygon points="-90,8 -90,82 -78,90 -78,-2" fill="#CDA77C"/>
+        <rect x="-90" y="-2" width="180" height="92" rx="4" fill="url(#retailWall)" stroke="#A04818" stroke-width="2.2"/>
+        <polygon points="-104,-2 0,-72 104,-2" fill="url(#tiles)" stroke="#6B1E12" stroke-width="2"/>
+        <polygon points="-104,-2 0,-72 104,-2" fill="#000" opacity="0.08"/>
+        <polygon points="-100,-4 0,-68 -4,-68 -80,-6" fill="#fff" opacity="0.18"/>
+        <rect x="40" y="-58" width="12" height="24" fill="#8B4513"/>
+        <rect x="38" y="-62" width="16" height="5" fill="#6B3410"/>
+        <path d="M -84,18 L 84,18 L 70,38 L -70,38 Z" fill="#FF7043"/>
+        <g stroke="#FFF4EC" stroke-width="3.5">
+          <line x1="-60" y1="20" x2="-64" y2="38"/>
+          <line x1="-35" y1="20" x2="-40" y2="38"/>
+          <line x1="-10" y1="20" x2="-14" y2="38"/>
+          <line x1="15"  y1="20" x2="11"  y2="38"/>
+          <line x1="40"  y1="20" x2="36"  y2="38"/>
+          <line x1="65"  y1="20" x2="61"  y2="38"/>
+        </g>
+        <g fill="#C0392B">
+          <circle cx="-60" cy="38" r="3"/><circle cx="-40" cy="38" r="3"/>
+          <circle cx="-20" cy="38" r="3"/><circle cx="0"   cy="38" r="3"/>
+          <circle cx="20"  cy="38" r="3"/><circle cx="40"  cy="38" r="3"/>
+          <circle cx="60"  cy="38" r="3"/>
+        </g>
+        <rect x="-70" y="46" width="58" height="38" fill="#B3E5FC" stroke="#A04818" stroke-width="1.5"/>
+        <line x1="-70" y1="66" x2="-12" y2="66" stroke="#A04818" stroke-width="0.9"/>
+        <line x1="-41" y1="46" x2="-41" y2="84" stroke="#A04818" stroke-width="0.9"/>
+        <rect x="-64" y="70" width="10" height="10" fill="#D4A24C"/>
+        <rect x="-52" y="70" width="10" height="10" fill="#C8651A"/>
+        <rect x="-40" y="70" width="10" height="10" fill="#D4A24C"/>
+        <rect x="18" y="40" width="36" height="50" rx="2" fill="#7A3A14"/>
+        <rect x="22" y="44" width="28" height="26" fill="#C9A37A"/>
+        <circle cx="47" cy="68" r="1.6" fill="#FFD700"/>
+        <rect x="-56" y="-22" width="112" height="20" rx="3" fill="white" stroke="#A04818" stroke-width="1.8"/>
+        <text x="0" y="-8" text-anchor="middle" font-size="13" font-weight="800" fill="#A04818" letter-spacing="1.5">BEER SHOP</text>
+        <text class="station-label" id="label-Retailer" x="0" y="118">Retailer</text>
+      </g>
+
+      <!-- WHOLESALER (top-right, 1420,280) -->
+      <g id="building-Wholesaler" transform="translate(1420,280)" filter="url(#softShadow)">
+        <ellipse cx="0" cy="92" rx="118" ry="10" fill="#000" opacity="0.18"/>
+        <polygon points="-96,6 -96,88 -82,96 -82,0" fill="#7EA37B"/>
+        <rect x="-96" y="-12" width="192" height="100" rx="4" fill="url(#wholeWall)" stroke="#1E5A20" stroke-width="2.2"/>
+        <rect x="-102" y="-32" width="204" height="22" fill="#66BB6A" stroke="#1E5A20" stroke-width="2"/>
+        <rect x="-102" y="-30" width="204" height="6" fill="#fff" opacity="0.22"/>
+        <polygon points="-102,-12 -90,-12 -80,-32 -92,-32" fill="#1E5A20" opacity="0.45"/>
+        <polygon points="102,-12 90,-12 80,-32 92,-32" fill="#1E5A20" opacity="0.45"/>
+        <text x="0" y="-16" text-anchor="middle" font-size="13" font-weight="800" fill="white" letter-spacing="1.4">WHOLESALE</text>
+        <g fill="#FFF3B8" stroke="#1E5A20" stroke-width="1.2">
+          <rect x="-82"  y="4" width="20" height="18"/>
+          <rect x="-56"  y="4" width="20" height="18"/>
+          <rect x="-30"  y="4" width="20" height="18"/>
+          <rect x="-4"   y="4" width="20" height="18"/>
+          <rect x="22"   y="4" width="20" height="18"/>
+          <rect x="48"   y="4" width="20" height="18"/>
+          <rect x="74"   y="4" width="12" height="18"/>
+        </g>
+        <rect x="-40" y="38" width="80" height="50" rx="2" fill="#1E5A20"/>
+        <rect x="-36" y="42" width="72" height="42" fill="#8FCF86"/>
+        <line x1="0" y1="42" x2="0" y2="84" stroke="#1E5A20" stroke-width="1.8"/>
+        <rect x="-90" y="62" width="16" height="22" fill="#D4A24C" stroke="#8B4513" stroke-width="1"/>
+        <rect x="-90" y="46" width="16" height="18" fill="#C8651A" stroke="#8B4513" stroke-width="1"/>
+        <rect x="72"  y="60" width="18" height="26" fill="#D4A24C" stroke="#8B4513" stroke-width="1"/>
+        <g transform="translate(58,84)">
+          <rect x="-6" y="-10" width="14" height="10" fill="#F5A623" stroke="#8B5F10" stroke-width="0.8"/>
+          <rect x="-4" y="-14" width="10" height="5" fill="#B87708"/>
+          <circle cx="-4" cy="2" r="3.5" fill="#222"/>
+          <circle cx="6"  cy="2" r="3.5" fill="#222"/>
+          <line x1="8" y1="-4" x2="16" y2="-4" stroke="#444" stroke-width="1.6"/>
+          <line x1="8" y1="-1" x2="16" y2="-1" stroke="#444" stroke-width="1.6"/>
+        </g>
+        <text class="station-label" id="label-Wholesaler" x="0" y="118">Wholesaler</text>
+      </g>
+
+      <!-- DISTRIBUTOR (bottom-left, 380,780) -->
+      <g id="building-Distributor" transform="translate(380,780)" filter="url(#softShadow)">
+        <ellipse cx="0" cy="92" rx="118" ry="10" fill="#000" opacity="0.18"/>
+        <polygon points="-96,2 -96,88 -82,96 -82,-4" fill="#6E9BBB"/>
+        <rect x="-96" y="-4" width="192" height="96" rx="4" fill="url(#distWall)" stroke="#0D47A1" stroke-width="2.2"/>
+        <path d="M -100,-4 Q -68,-46 -36,-4" fill="#42A5F5" stroke="#0D47A1" stroke-width="2"/>
+        <path d="M -36,-4  Q -4,-46 28,-4"   fill="#5AAEF7" stroke="#0D47A1" stroke-width="2"/>
+        <path d="M 28,-4   Q 60,-46 92,-4"   fill="#42A5F5" stroke="#0D47A1" stroke-width="2"/>
+        <path d="M 92,-4   Q 116,-34 100,-4" fill="#5AAEF7" stroke="#0D47A1" stroke-width="2" opacity="0.8"/>
+        <text x="-4" y="-12" text-anchor="middle" font-size="12" font-weight="800" fill="white" letter-spacing="1.2">DISTRIBUTION</text>
+        <g>
+          <rect x="-84" y="18" width="26" height="70" rx="2" fill="#0D47A1"/>
+          <rect x="-82" y="22" width="22" height="62" fill="#7FB3E0"/>
+          <line x1="-82" y1="40" x2="-60" y2="40" stroke="#0D47A1" stroke-width="0.8"/>
+          <line x1="-82" y1="58" x2="-60" y2="58" stroke="#0D47A1" stroke-width="0.8"/>
+          <rect x="-52" y="18" width="26" height="70" rx="2" fill="#0D47A1"/>
+          <rect x="-50" y="22" width="22" height="62" fill="#7FB3E0"/>
+          <line x1="-50" y1="40" x2="-28" y2="40" stroke="#0D47A1" stroke-width="0.8"/>
+          <rect x="-20" y="18" width="26" height="70" rx="2" fill="#0D47A1"/>
+          <rect x="-18" y="22" width="22" height="62" fill="#7FB3E0"/>
+          <line x1="-18" y1="40" x2="4" y2="40" stroke="#0D47A1" stroke-width="0.8"/>
+          <rect x="12"  y="18" width="26" height="70" rx="2" fill="#0D47A1"/>
+          <rect x="14"  y="22" width="22" height="62" fill="#7FB3E0"/>
+          <rect x="44"  y="18" width="26" height="70" rx="2" fill="#0D47A1"/>
+          <rect x="46"  y="22" width="22" height="62" fill="#7FB3E0"/>
+        </g>
+        <rect x="-108" y="74" width="14" height="16" fill="#C8651A" stroke="#8B4513" stroke-width="1"/>
+        <rect x="-108" y="56" width="14" height="16" fill="#D4A24C" stroke="#8B4513" stroke-width="1"/>
+        <text class="station-label" id="label-Distributor" x="0" y="118">Distributor</text>
+      </g>
+
+      <!-- FACTORY (bottom-right, 1420,780) -->
+      <g id="building-Manufacturer" transform="translate(1420,780)" filter="url(#softShadow)">
+        <ellipse cx="0" cy="92" rx="120" ry="10" fill="#000" opacity="0.18"/>
+        <polygon points="-96,6 -96,88 -82,96 -82,0" fill="#8F619A"/>
+        <rect x="-96" y="0" width="192" height="92" rx="4" fill="url(#factoryWall)" stroke="#4A148C" stroke-width="2.2"/>
+        <rect x="-96" y="-22" width="192" height="22" fill="#AB47BC" stroke="#4A148C" stroke-width="2"/>
+        <rect x="-96" y="-20" width="192" height="6" fill="#fff" opacity="0.22"/>
+        <text x="0" y="-6" text-anchor="middle" font-size="13" font-weight="800" fill="white" letter-spacing="1.5">FACTORY</text>
+        <rect x="-60" y="-72" width="16" height="50" fill="#8E4DA0" stroke="#4A148C" stroke-width="1.6"/>
+        <rect x="-60" y="-76" width="16" height="5"  fill="#4A148C"/>
+        <rect x="-32" y="-86" width="16" height="64" fill="#8E4DA0" stroke="#4A148C" stroke-width="1.6"/>
+        <rect x="-32" y="-90" width="16" height="5"  fill="#4A148C"/>
+        <rect x="-4"  y="-80" width="16" height="58" fill="#8E4DA0" stroke="#4A148C" stroke-width="1.6"/>
+        <rect x="-4"  y="-84" width="16" height="5"  fill="#4A148C"/>
+        <g opacity="0.88">
+          <circle cx="-52" cy="-82" r="7" fill="#fff">
+            <animate attributeName="cy"      values="-82;-116;-150" dur="3.2s" repeatCount="indefinite"/>
+            <animate attributeName="r"       values="7;11;15"        dur="3.2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.85;0.4;0"     dur="3.2s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="-24" cy="-96" r="7" fill="#fff">
+            <animate attributeName="cy"      values="-96;-130;-164" dur="3.6s" begin="1s" repeatCount="indefinite"/>
+            <animate attributeName="r"       values="7;11;15"        dur="3.6s" begin="1s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.85;0.4;0"     dur="3.6s" begin="1s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="4"   cy="-88" r="7" fill="#fff">
+            <animate attributeName="cy"      values="-88;-122;-156" dur="3.4s" begin="0.5s" repeatCount="indefinite"/>
+            <animate attributeName="r"       values="7;11;15"        dur="3.4s" begin="0.5s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.85;0.4;0"     dur="3.4s" begin="0.5s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <g fill="#FFF3B8" stroke="#4A148C" stroke-width="1.2">
+          <rect x="-80" y="14" width="20" height="18"/>
+          <rect x="-52" y="14" width="20" height="18"/>
+          <rect x="-24" y="14" width="20" height="18"/>
+          <rect x="4"   y="14" width="20" height="18"/>
+          <rect x="32"  y="14" width="20" height="18"/>
+          <rect x="60"  y="14" width="20" height="18"/>
+        </g>
+        <rect x="-22" y="44" width="44" height="48" rx="2" fill="#4A148C"/>
+        <rect x="-18" y="48" width="36" height="36" fill="#C99BD0"/>
+        <line x1="0"  y1="48" x2="0" y2="84" stroke="#4A148C" stroke-width="1.6"/>
+        <text class="station-label" id="label-Manufacturer" x="0" y="118">Factory</text>
+      </g>
+
+      <!-- CUSTOMER -->
+      <g id="building-Customer" transform="translate(170,420)" filter="url(#softShadow)">
+        <ellipse cx="0" cy="22" rx="22" ry="4" fill="#000" opacity="0.18"/>
+        <use href="#customerSym" x="-22" y="-40" width="44" height="62"/>
+        <text class="station-label" x="0" y="48" font-size="13">Customer</text>
+      </g>
+
+      <!-- ═══ INFO CARDS (rendered dynamically by JS) ═══ -->
+      <g id="info-cards"></g>
+
+      <!-- ═══ WEEK BADGE (rendered dynamically by JS) ═══ -->
+      <g id="week-badge-g" class="week-badge-g"></g>
+
+      <!-- ═══ TRUCKS + LABELS (rendered by JS) ═══ -->
+      <g id="trucks"></g>
+      <g id="truck-labels"></g>
+
+    </svg>
     </div>
 
     <!-- Round progress -->
@@ -2329,7 +2884,330 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// SVG Building generators
+// ═══ Z3f GAME BOARD — update static SVG elements dynamically ═══
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+const TRUCK_W = 84;
+const TRUCK_H = 52;
+
+// Building positions in SVG coordinates (matching the static SVG)
+const BUILDING_POS = {
+    Retailer:     { x: 380,  y: 280 },
+    Wholesaler:   { x: 1420, y: 280 },
+    Distributor:  { x: 380,  y: 780 },
+    Manufacturer: { x: 1420, y: 780 },
+    Customer:     { x: 170,  y: 420 },
+};
+
+// Info card positions (offset from buildings)
+const CARD_POS = {
+    Retailer:     { x: 500,  y: 140, w: 200, h: 200 },
+    Wholesaler:   { x: 1100, y: 140, w: 200, h: 200 },
+    Distributor:  { x: 500,  y: 640, w: 200, h: 200 },
+    Manufacturer: { x: 1100, y: 640, w: 200, h: 200 },
+};
+
+// Road segment mapping:
+// segPath-0: Factory(1420,780) -> Distributor(380,780)  = Distributor's pipeline_detail
+// segPath-1: Distributor(380,780) -> Wholesaler(1420,280) = Wholesaler's pipeline_detail
+// segPath-2: Wholesaler(1420,280) -> Retailer(380,280) = Retailer's pipeline_detail
+// segPath-3: Retailer(380,280) -> Customer(170,420) = Retailer's shipped amount
+const SEG_ROLE_MAP = [
+    { pathId: 'segPath-0', role: 'Distributor' },
+    { pathId: 'segPath-1', role: 'Wholesaler' },
+    { pathId: 'segPath-2', role: 'Retailer' },
+];
+
+// Animation state
+let _truckAnim = { progress: 1, rafId: null, startTime: null };
+
+function animateTrucksIn() {
+    if (_truckAnim.rafId) cancelAnimationFrame(_truckAnim.rafId);
+    _truckAnim.progress = 0;
+    _truckAnim.startTime = null;
+    const DURATION = 1500; // ms
+
+    function step(ts) {
+        if (!_truckAnim.startTime) _truckAnim.startTime = ts;
+        const elapsed = ts - _truckAnim.startTime;
+        _truckAnim.progress = Math.min(1, elapsed / DURATION);
+        // Ease out cubic
+        _truckAnim.progress = 1 - Math.pow(1 - _truckAnim.progress, 3);
+        _renderTrucksAtProgress(_truckAnim.progress);
+        if (elapsed < DURATION) {
+            _truckAnim.rafId = requestAnimationFrame(step);
+        } else {
+            _truckAnim.rafId = null;
+        }
+    }
+    _truckAnim.rafId = requestAnimationFrame(step);
+}
+
+// Cache pipeline data for truck rendering during animation
+let _cachedTruckData = null;
+
+function _renderTrucksAtProgress(progress) {
+    if (!_cachedTruckData) return;
+    const { segments, customerShipped, role } = _cachedTruckData;
+
+    const trucksG = document.getElementById('trucks');
+    const labelsG = document.getElementById('truck-labels');
+    if (!trucksG || !labelsG) return;
+    trucksG.textContent = '';
+    labelsG.textContent = '';
+
+    // Render trucks on segments 0-2
+    segments.forEach(seg => {
+        const path = document.getElementById(seg.pathId);
+        if (!path) return;
+        const pathLen = path.getTotalLength();
+        const pipeArr = seg.pipelineDetail || [];
+        const slotCount = pipeArr.length;
+        if (slotCount === 0) return;
+
+        pipeArr.forEach((units, slotIdx) => {
+            const frac = (slotIdx + progress) / slotCount;
+            const clamped = Math.max(0.001, Math.min(0.999, frac));
+
+            const pt = path.getPointAtLength(pathLen * clamped);
+            const aheadLen = Math.min(pathLen, pathLen * clamped + 0.6);
+            const pt2 = path.getPointAtLength(aheadLen);
+            let angle = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+
+            // Keep trucks right-side up with horizontal flip for leftward movement
+            let displayAngle = angle;
+            let flipX = 1;
+            if (angle > 90 || angle < -90) {
+                displayAngle = angle + 180;
+                if (displayAngle > 180) displayAngle -= 360;
+                flipX = -1;
+            }
+
+            // Truck element
+            const g = document.createElementNS(SVG_NS, 'g');
+            g.setAttribute('transform',
+                `translate(${pt.x.toFixed(2)},${pt.y.toFixed(2)}) rotate(${displayAngle.toFixed(2)}) scale(${flipX},1)`);
+            g.setAttribute('filter', 'url(#truckShadow)');
+            const use = document.createElementNS(SVG_NS, 'use');
+            use.setAttribute('href', '#truck');
+            use.setAttribute('x', -TRUCK_W / 2);
+            use.setAttribute('y', -TRUCK_H / 2);
+            use.setAttribute('width', TRUCK_W);
+            use.setAttribute('height', TRUCK_H);
+            g.appendChild(use);
+            trucksG.appendChild(g);
+
+            // Label in screen-space (always upright)
+            const lblG = document.createElementNS(SVG_NS, 'g');
+            lblG.setAttribute('transform', `translate(${pt.x.toFixed(2)},${(pt.y - 38).toFixed(2)})`);
+            const bg = document.createElementNS(SVG_NS, 'rect');
+            bg.setAttribute('x', '-15'); bg.setAttribute('y', '-11');
+            bg.setAttribute('width', '30'); bg.setAttribute('height', '17');
+            bg.setAttribute('rx', '4');
+            bg.setAttribute('class', 'truck-label-bg');
+            lblG.appendChild(bg);
+            const txt = document.createElementNS(SVG_NS, 'text');
+            txt.setAttribute('x', '0'); txt.setAttribute('y', '2');
+            txt.setAttribute('class', 'truck-label');
+            txt.textContent = units;
+            lblG.appendChild(txt);
+            labelsG.appendChild(lblG);
+        });
+    });
+
+    // Seg 3: Customer exit - single truck with Retailer's shipped amount
+    if (customerShipped != null) {
+        const path = document.getElementById('segPath-3');
+        if (path) {
+            const pathLen = path.getTotalLength();
+            const clamped = Math.max(0.001, Math.min(0.999, progress * 0.8 + 0.1));
+            const pt = path.getPointAtLength(pathLen * clamped);
+            const aheadLen = Math.min(pathLen, pathLen * clamped + 0.6);
+            const pt2 = path.getPointAtLength(aheadLen);
+            let angle = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+            let displayAngle = angle;
+            let flipX = 1;
+            if (angle > 90 || angle < -90) {
+                displayAngle = angle + 180;
+                if (displayAngle > 180) displayAngle -= 360;
+                flipX = -1;
+            }
+
+            const g = document.createElementNS(SVG_NS, 'g');
+            g.setAttribute('transform',
+                `translate(${pt.x.toFixed(2)},${pt.y.toFixed(2)}) rotate(${displayAngle.toFixed(2)}) scale(${flipX},1)`);
+            g.setAttribute('filter', 'url(#truckShadow)');
+            const use = document.createElementNS(SVG_NS, 'use');
+            use.setAttribute('href', '#truck');
+            use.setAttribute('x', -TRUCK_W / 2);
+            use.setAttribute('y', -TRUCK_H / 2);
+            use.setAttribute('width', TRUCK_W);
+            use.setAttribute('height', TRUCK_H);
+            g.appendChild(use);
+            trucksG.appendChild(g);
+
+            const lblG = document.createElementNS(SVG_NS, 'g');
+            lblG.setAttribute('transform', `translate(${pt.x.toFixed(2)},${(pt.y - 38).toFixed(2)})`);
+            const bg = document.createElementNS(SVG_NS, 'rect');
+            bg.setAttribute('x', '-15'); bg.setAttribute('y', '-11');
+            bg.setAttribute('width', '30'); bg.setAttribute('height', '17');
+            bg.setAttribute('rx', '4');
+            bg.setAttribute('class', 'truck-label-bg');
+            lblG.appendChild(bg);
+            const txt = document.createElementNS(SVG_NS, 'text');
+            txt.setAttribute('x', '0'); txt.setAttribute('y', '2');
+            txt.setAttribute('class', 'truck-label');
+            txt.textContent = customerShipped;
+            lblG.appendChild(txt);
+            labelsG.appendChild(lblG);
+        }
+    }
+}
+
+// Main render function — updates the static Z3f SVG with live game data
+function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
+    const role = APP.activeRole;
+    const svg = document.getElementById('gameSvg');
+    if (!svg) return;
+
+    const myTeam = teamsSummary ? teamsSummary.find(t => t.id === APP.teamId) : null;
+    const playerNames = {};
+    if (myTeam) for (const r of myTeam.roles) playerNames[r.role] = r.player_name;
+
+    const stages = ['Manufacturer', 'Distributor', 'Wholesaler', 'Retailer'];
+    const stageData = {};
+    for (const s of stages) {
+        const rds = roleData[s] || [];
+        stageData[s] = { last: rds[rds.length - 1] || null };
+    }
+
+    // ── Update building opacity and station labels ──
+    stages.forEach(s => {
+        const buildingG = document.getElementById(`building-${s}`);
+        if (buildingG) {
+            const isMe = s === role;
+            buildingG.setAttribute('opacity', isMe ? '1' : '0.45');
+        }
+        // Update station label with player name
+        const labelEl = document.getElementById(`label-${s}`);
+        if (labelEl) {
+            const displayName = s === 'Manufacturer' ? 'Factory' : s;
+            const pName = playerNames[s] || '';
+            labelEl.innerHTML = `${displayName}${pName ? ' <tspan class="player">\u00B7 ' + pName + '</tspan>' : ''}`;
+        }
+    });
+
+    // Customer building opacity
+    const custG = document.getElementById('building-Customer');
+    if (custG) {
+        custG.setAttribute('opacity', role === 'Retailer' ? '1' : '0.45');
+    }
+
+    // ── Update info cards ──
+    const cardsG = document.getElementById('info-cards');
+    if (cardsG) {
+        cardsG.textContent = '';
+        stages.forEach(s => {
+            const cp = CARD_POS[s];
+            if (!cp) return;
+            const isMe = s === role;
+            const d = stageData[s].last;
+
+            const fo = document.createElementNS(SVG_NS, 'foreignObject');
+            fo.setAttribute('x', cp.x);
+            fo.setAttribute('y', cp.y);
+            fo.setAttribute('width', cp.w);
+            fo.setAttribute('height', cp.h);
+            fo.setAttribute('opacity', isMe ? '1' : '0.45');
+
+            const div = document.createElementNS(XHTML_NS, 'div');
+            div.setAttribute('xmlns', XHTML_NS);
+            div.className = 'info-card';
+
+            const displayRole = s === 'Manufacturer' ? 'Factory' : s;
+            const roleClass = s === 'Manufacturer' ? 'Manufacturer' : s;
+            const stock = d ? d.inventory : 12;
+            const backlog = d ? d.backlog : 0;
+            const pipeline = d ? d.pipeline : 0;
+            const demand = d ? d.demand : '-';
+            const shipped = d ? (d.shipped != null ? d.shipped : d.outgoing || '-') : '-';
+            const cost = d ? d.cumulative_cost.toFixed(2) : '0.00';
+            const order = d ? d.order : '-';
+
+            // For Retailer show Demand, for others show Outgoing/Shipped
+            const demandLabel = s === 'Retailer' ? 'Demand' : 'Outgoing';
+            const demandVal = s === 'Retailer' ? demand : shipped;
+
+            div.innerHTML = `
+                <div class="role ${roleClass}">${displayRole}</div>
+                <div class="row"><span class="label">Stock</span><span class="val">${stock}</span></div>
+                <div class="row bl"><span class="label">Backlog</span><span class="val" data-warn="${backlog > 0 ? 1 : 0}">${backlog}</span></div>
+                <div class="row"><span class="label">Pipeline</span><span class="val">${s === 'Manufacturer' ? '\u2014' : pipeline}</span></div>
+                <div class="divider"></div>
+                <div class="row"><span class="label">${demandLabel}</span><span class="val">${demandVal}</span></div>
+                <div class="row cost"><span class="label">Cost</span><span class="val">${cost}</span></div>
+                <div class="row"><span class="label">Order</span><span class="val" style="font-weight:800;color:#E67E22">${order}</span></div>
+            `;
+            fo.appendChild(div);
+            cardsG.appendChild(fo);
+        });
+    }
+
+    // ── Week badge inside SVG ──
+    const weekG = document.getElementById('week-badge-g');
+    if (weekG) {
+        weekG.innerHTML = `
+            <rect x="30" y="20" width="180" height="44" rx="14" fill="rgba(255,255,255,0.92)"
+                  stroke="#C9B889" stroke-width="1.5" filter="url(#softShadow)"/>
+            <text x="120" y="48" text-anchor="middle" font-size="15" font-weight="700" fill="#1C2633"
+                  font-family="-apple-system,BlinkMacSystemFont,sans-serif">
+                Week <tspan font-size="22" font-weight="800" fill="#C8651A">${round}</tspan> / ${totalRounds}
+            </text>
+        `;
+    }
+
+    // ── Prepare truck data and animate ──
+    const truckSegments = SEG_ROLE_MAP.map(seg => {
+        const d = stageData[seg.role] ? stageData[seg.role].last : null;
+        return {
+            pathId: seg.pathId,
+            pipelineDetail: d && d.pipeline_detail ? d.pipeline_detail : [],
+        };
+    });
+
+    // Customer exit truck: Retailer's shipped amount
+    const retailerLast = stageData.Retailer ? stageData.Retailer.last : null;
+    const customerShipped = retailerLast ? (retailerLast.shipped != null ? retailerLast.shipped : null) : null;
+
+    _cachedTruckData = {
+        segments: truckSegments,
+        customerShipped: customerShipped,
+        role: role,
+    };
+
+    // Animate trucks from 0 to 1
+    animateTrucksIn();
+
+    // ── Speech bubble for AI reasoning ──
+    if (round > 0 && stageData[role] && stageData[role].last && stageData[role].last.reasoning) {
+        const reasoning = stageData[role].last.reasoning;
+        const short = reasoning.length > 120 ? reasoning.substring(0, 120) + '...' : reasoning;
+        const bubble = document.createElement('div');
+        bubble.className = 'speech-bubble';
+        const bp = BUILDING_POS[role];
+        if (bp) {
+            const boardEl = document.getElementById('gameBoard');
+            bubble.style.left = (bp.x / 1800 * 100) + '%';
+            bubble.style.bottom = (100 - bp.y / 1000 * 100 + 5) + '%';
+            bubble.textContent = short;
+            boardEl.querySelectorAll('.speech-bubble').forEach(b => b.remove());
+            boardEl.appendChild(bubble);
+            setTimeout(() => bubble.remove(), 4000);
+        }
+    }
+}
+
 function svgRetailer(x, y) {
     return `<g transform="translate(${x-50},${y-45})">
         <rect x="5" y="30" width="90" height="50" rx="3" fill="#FBE9E7" stroke="#E64A19" stroke-width="1.5"/>
@@ -2451,134 +3329,7 @@ function svgDecorations() {
     return d;
 }
 
-// Main render function
-function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
-    const role = APP.activeRole;
-    const svg = document.getElementById('gameSvg');
-    if (!svg) return;
-
-    const myTeam = teamsSummary ? teamsSummary.find(t => t.id === APP.teamId) : null;
-    const playerNames = {};
-    if (myTeam) for (const r of myTeam.roles) playerNames[r.role] = r.player_name;
-
-    const stages = ['Manufacturer', 'Distributor', 'Wholesaler', 'Retailer'];
-    const stageData = {};
-    for (const s of stages) {
-        const rds = roleData[s] || [];
-        stageData[s] = { last: rds[rds.length - 1] || null };
-    }
-
-    // Coordinates
-    const pos = { Retailer:[160,140], Wholesaler:[800,140], Factory:[160,400], Distributor:[800,400], Customer:[160,270] };
-
-    // Road path: Factory → Distributor → Wholesaler → Retailer (no road to Customer)
-    const roadPath = `M ${pos.Factory} L ${pos.Distributor} L ${pos.Wholesaler} L ${pos.Retailer}`;
-
-    // Road segments for truck placement
-    const segments = [
-        { from:'Factory', to:'Distributor', src:'Manufacturer', dir:'right', p1:pos.Factory, p2:pos.Distributor },
-        { from:'Distributor', to:'Wholesaler', src:'Distributor', dir:'up', p1:pos.Distributor, p2:pos.Wholesaler },
-        { from:'Wholesaler', to:'Retailer', src:'Wholesaler', dir:'left', p1:pos.Wholesaler, p2:pos.Retailer },
-    ];
-
-    let content = '';
-
-    // Decorations (background layer)
-    content += svgDecorations();
-
-    // Road
-    content += `<path d="${roadPath}" stroke="#607D8B" stroke-width="32" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-    content += `<path d="${roadPath}" stroke="#78909C" stroke-width="28" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-    content += `<path d="${roadPath}" stroke="#FFE082" stroke-width="2" fill="none" stroke-dasharray="12 10" stroke-linecap="round" stroke-linejoin="round"/>`;
-
-    // Trucks on each segment
-    segments.forEach((seg, i) => {
-        const isMe = seg.src === role;
-        const d = stageData[seg.src];
-        const pipe = d.last ? d.last.pipeline : 0;
-        const showUnits = isMe ? pipe : 0;
-        // Position truck along segment based on round
-        const t = round > 0 ? ((round * 30 + i * 25) % 80 + 10) / 100 : 0.5;
-        const tx = seg.p1[0] + (seg.p2[0] - seg.p1[0]) * t;
-        const ty = seg.p1[1] + (seg.p2[1] - seg.p1[1]) * t;
-        content += svgTruck(tx, ty, seg.dir, showUnits);
-    });
-
-    // Buildings
-    const buildings = [
-        { role:'Retailer', fn:svgRetailer, pos:pos.Retailer },
-        { role:'Wholesaler', fn:svgWholesaler, pos:pos.Wholesaler },
-        { role:'Manufacturer', fn:svgFactory, pos:pos.Factory },
-        { role:'Distributor', fn:svgDistributor, pos:pos.Distributor },
-    ];
-
-    buildings.forEach(b => {
-        const isMe = b.role === role;
-        const opacity = isMe ? 1 : 0.45;
-        content += `<g opacity="${opacity}">${b.fn(b.pos[0], b.pos[1])}</g>`;
-
-        // Name label
-        const name = playerNames[b.role] || '?';
-        const color = isMe ? getComputedStyle(document.documentElement).getPropertyValue(`--${b.role.toLowerCase()}`) || '#333' : '#666';
-        content += `<text x="${b.pos[0]}" y="${b.pos[1]+58}" text-anchor="middle" font-size="10" fill="${color}" font-weight="bold" font-family="Arial">${b.role}</text>`;
-        content += `<text x="${b.pos[0]}" y="${b.pos[1]+70}" text-anchor="middle" font-size="9" fill="#666" font-family="Arial">${name}</text>`;
-
-        // Info panel for YOUR station
-        if (isMe && stageData[b.role] && stageData[b.role].last) {
-            const dl = stageData[b.role].last;
-            const px = b.pos[0] < 480 ? b.pos[0] + 80 : b.pos[0] - 210;
-            const py = b.pos[1] - 60;
-            content += `<foreignObject x="${px}" y="${py}" width="180" height="170">
-                <div xmlns="http://www.w3.org/1999/xhtml" style="background:white;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.12);font-family:Arial;font-size:11px;color:#2C3E50;border-left:4px solid ${color.trim()}">
-                    <div style="font-weight:700;font-size:12px;margin-bottom:6px">Week ${round} — ${b.role}</div>
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Receipt</span><span style="font-weight:700;color:#4CAF50">${dl.incoming_shipment ?? '-'}</span></div>
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Demand</span><span style="font-weight:700">${dl.demand}</span></div>
-                    <hr style="border:none;border-top:1px solid #eee;margin:4px 0">
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Stock</span><span style="font-weight:700;color:${dl.inventory===0?'#E74C3C':'#4CAF50'}">${dl.inventory}</span></div>
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Backlog</span><span style="font-weight:700;color:${dl.backlog>0?'#E74C3C':'#333'}">${dl.backlog}</span></div>
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Pipeline</span><span style="font-weight:700">${dl.pipeline}</span></div>
-                    <hr style="border:none;border-top:1px solid #eee;margin:4px 0">
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Cost</span><span style="font-weight:700;color:#E74C3C">${dl.cumulative_cost.toFixed(1)} EUR</span></div>
-                    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#7F8C8D">Order</span><span style="font-weight:700;color:#E67E22;font-size:14px">${dl.order}</span></div>
-                </div>
-            </foreignObject>`;
-        }
-    });
-
-    // Customer — sits directly next to Retailer (no road)
-    const isRetailer = role === 'Retailer';
-    const custDemand = isRetailer && stageData.Retailer.last ? stageData.Retailer.last.demand : '?';
-    content += `<g opacity="${isRetailer ? 1 : 0.5}">${svgCustomer(pos.Customer[0], pos.Customer[1])}</g>`;
-    if (isRetailer) {
-        content += `<text x="${pos.Customer[0]}" y="${pos.Customer[1]+35}" text-anchor="middle" font-size="9" fill="#F57C00" font-weight="bold" font-family="Arial">Demand: ${custDemand}</text>`;
-    }
-
-    // Week badge
-    content += `<rect x="830" y="10" width="120" height="28" rx="14" fill="rgba(255,255,255,0.85)"/>`;
-    content += `<text x="890" y="29" text-anchor="middle" font-size="11" fill="#333" font-weight="bold" font-family="Arial">Week ${round} / ${totalRounds}</text>`;
-
-    svg.innerHTML = content;
-
-    // Show reasoning speech bubble for 4 seconds
-    if (round > 0 && stageData[role] && stageData[role].last && stageData[role].last.reasoning) {
-        const reasoning = stageData[role].last.reasoning;
-        const short = reasoning.length > 120 ? reasoning.substring(0, 120) + '...' : reasoning;
-        const bubble = document.createElement('div');
-        bubble.className = 'speech-bubble';
-        const myPos = buildings.find(b => b.role === role);
-        if (myPos) {
-            // Position relative to board using percentages
-            const boardEl = document.getElementById('gameBoard');
-            bubble.style.left = (myPos.pos[0] / 960 * 100) + '%';
-            bubble.style.bottom = (100 - myPos.pos[1] / 540 * 100 + 5) + '%';
-            bubble.textContent = short;
-            // Remove old bubbles
-            boardEl.querySelectorAll('.speech-bubble').forEach(b => b.remove());
-            boardEl.appendChild(bubble);
-            setTimeout(() => bubble.remove(), 4000);
-        }
-    }
-}
+// (Old renderGameBoard removed — replaced by Z3f version above)
 
 
 // ═══ CHART DRAWING (pure Canvas, no library) ═══
