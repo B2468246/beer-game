@@ -436,10 +436,11 @@ def init_team_state(team: dict) -> dict:
             "inventory": init_inv,
             "backlog": 0,
             "pipeline": [init_pipe] * lead_time,  # pipeline[0] arrives next round
-            "outstanding": 0,
+            "outstanding": 0,            # units ordered from upstream but not yet shipped
             "cumulative_cost": 0.0,
-            "orders_placed": [],  # for bullwhip calculation
+            "orders_placed": [],         # for bullwhip calculation
             "demands_received": [],
+            "pending_from_downstream": 0,  # unfulfilled orders from downstream role
         }
     return team_state
 
@@ -508,6 +509,7 @@ async def run_game():
                         "inventory": rs["inventory"] + incoming,
                         "backlog": rs["backlog"],
                         "pipeline": sum(rs["pipeline"]),
+                        "outstanding": rs["outstanding"],
                         "incoming_shipment": incoming,
                         "cumulative_cost": rs["cumulative_cost"],
                         "holding_cost": settings["holding_cost"],
@@ -617,26 +619,47 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             else:
                 demands[role] = settings.get("step_demand_before", 4)
 
-    # Process each role and collect AI calls
-    ai_tasks = []
+    # ── Step 1: Upstream fulfillment of pending orders from last round ──
+    # Each role tries to ship what downstream ordered last round.
+    # Process upstream→downstream (Manufacturer first, then Distributor, etc.)
     round_incoming = {}   # role -> incoming shipment this round
-    round_shipped = {}    # role -> units shipped this round
+    round_shipped = {}    # role -> units shipped to downstream this round
     for role in ROLES:
         rs = ts[role]
 
-        # 1. Receive incoming shipment (front of pipeline)
+        # Receive incoming shipment from OWN pipeline (goods arriving after lead_time)
         incoming = rs["pipeline"].pop(0) if rs["pipeline"] else 0
         rs["inventory"] += incoming
         round_incoming[role] = incoming
 
-        # 2. Process demand: fulfill from inventory, remainder becomes backlog
+    # Now each role fulfills demand from downstream's orders + own backlog
+    for role in ROLES:
+        rs = ts[role]
         demand = demands[role]
         rs["demands_received"].append(demand)
+
+        # Total demand = new demand (downstream's last order) + accumulated backlog
         total_demand = demand + rs["backlog"]
         shipped = min(rs["inventory"], total_demand)
         rs["inventory"] -= shipped
         rs["backlog"] = total_demand - shipped
         round_shipped[role] = shipped
+
+        # The shipped amount goes into the DOWNSTREAM role's pipeline
+        # (not our own pipeline — downstream receives what we ship)
+        role_idx = ROLES.index(role)
+        if role_idx > 0:
+            downstream_role = ROLES[role_idx - 1]
+            ds = ts[downstream_role]
+            ds["pipeline"].append(shipped)
+            # Reduce downstream's outstanding by what we shipped
+            ds["outstanding"] = max(0, ds["outstanding"] - shipped)
+
+    # ── Step 2: Collect AI decisions for all roles ──
+    ai_tasks = []
+    for role in ROLES:
+        rs = ts[role]
+        demand = demands[role]
 
         # Build round data for AI
         rd = {
@@ -646,7 +669,7 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             "backlog": rs["backlog"],
             "pipeline": sum(rs["pipeline"]),
             "outstanding": rs["outstanding"],
-            "incoming_shipment": incoming,
+            "incoming_shipment": round_incoming[role],
             "cumulative_cost": rs["cumulative_cost"],
         }
 
@@ -676,7 +699,7 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
     for (role, _), (order, reasoning) in zip(coros, gathered):
         results[role] = (order, reasoning)
 
-    # Apply orders and costs
+    # ── Step 3: Apply orders and costs ──
     for role in ROLES:
         rs = ts[role]
         order, reasoning = results[role]
@@ -685,17 +708,13 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
         # Record the order
         rs["orders_placed"].append(order)
 
-        # Add order to pipeline of upstream supplier
-        # For Manufacturer, supplier always ships full order after lead_time
+        # Manufacturer: external supplier always ships full order after lead_time
         if role == "Manufacturer":
             rs["pipeline"].append(order)
         else:
-            # upstream is the next role in the chain
-            upstream_idx = ROLES.index(role) + 1
-            upstream_role = ROLES[upstream_idx]
-            # The upstream will process this next round as demand
-            # For now, assume upstream ships what it can — handled by pipeline
-            rs["pipeline"].append(order)  # simplified: orders arrive after lead_time
+            # Order goes to upstream — track as outstanding.
+            # The upstream will try to fulfill it next round.
+            rs["outstanding"] += order
 
         # Costs for this round
         round_cost = settings["holding_cost"] * rs["inventory"] + settings["backlog_cost"] * rs["backlog"]
@@ -721,7 +740,7 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
 
 async def process_team_round_human(team: dict, ts: dict, round_num: int,
                                     customer_demand: int, settings: dict,
-                                    orders: dict):
+                                    human_orders: dict):
     """Process one round for one team using human-submitted orders."""
     lead_time = settings["lead_time"]
 
@@ -738,34 +757,52 @@ async def process_team_round_human(team: dict, ts: dict, round_num: int,
             else:
                 demands[role] = settings.get("step_demand_before", 4)
 
-    # Process each role
+    # ── Step 1: Receive incoming shipments ──
+    round_incoming = {}
     for role in ROLES:
         rs = ts[role]
-
-        # 1. Receive incoming shipment
         incoming = rs["pipeline"].pop(0) if rs["pipeline"] else 0
         rs["inventory"] += incoming
+        round_incoming[role] = incoming
 
-        # 2. Process demand
+    # ── Step 2: Fulfill demand (ship to downstream) ──
+    round_shipped = {}
+    for role in ROLES:
+        rs = ts[role]
         demand = demands[role]
         rs["demands_received"].append(demand)
         total_demand = demand + rs["backlog"]
         shipped = min(rs["inventory"], total_demand)
         rs["inventory"] -= shipped
         rs["backlog"] = total_demand - shipped
+        round_shipped[role] = shipped
 
-        # 3. Use human order (default to demand if missing)
-        order = orders.get(role, demand)
+        # Ship to downstream's pipeline
+        role_idx = ROLES.index(role)
+        if role_idx > 0:
+            downstream_role = ROLES[role_idx - 1]
+            ds = ts[downstream_role]
+            ds["pipeline"].append(shipped)
+            ds["outstanding"] = max(0, ds["outstanding"] - shipped)
+
+    # ── Step 3: Apply human orders ──
+    for role in ROLES:
+        rs = ts[role]
+        demand = demands[role]
+        order = human_orders.get(role, demand)
         rs["orders_placed"].append(order)
 
-        # 4. Pipeline
-        rs["pipeline"].append(order)
+        # Manufacturer: external supplier always ships full order
+        if role == "Manufacturer":
+            rs["pipeline"].append(order)
+        else:
+            rs["outstanding"] += order
 
-        # 5. Costs
+        # Costs
         round_cost = settings["holding_cost"] * rs["inventory"] + settings["backlog_cost"] * rs["backlog"]
         rs["cumulative_cost"] += round_cost
 
-        # 6. Save round data
+        # Save round data
         state["rounds_data"][team["id"]][role].append({
             "round": round_num,
             "demand": demand,
@@ -773,13 +810,13 @@ async def process_team_round_human(team: dict, ts: dict, round_num: int,
             "backlog": rs["backlog"],
             "pipeline": sum(rs["pipeline"]),
             "pipeline_detail": list(rs["pipeline"]),
-            "shipped": shipped,
+            "shipped": round_shipped[role],
             "outstanding": rs["outstanding"],
             "order": order,
             "cost": round_cost,
             "cumulative_cost": rs["cumulative_cost"],
             "reasoning": f"[Human] Ordered {order} units",
-            "incoming_shipment": incoming,
+            "incoming_shipment": round_incoming[role],
         })
 
 
