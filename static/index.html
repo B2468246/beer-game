@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=20">
+<link rel="stylesheet" href="/static/style.css?v=21">
 </head>
 <body>
 
@@ -2140,11 +2140,12 @@ async function studentStartGame() {
 }
 
 async function studentPlayAgain() {
-    // Reset session back to lobby (keeps joined players). The student
-    // will automatically land on the waiting screen via the ws broadcast.
-    const r = await api('/api/new-game', {});
+    // Keep same teams, go directly back to agent design screen.
+    // No professor action needed — each group restarts independently.
+    const r = await api('/api/restart', {});
     if (r.error) { alert(r.error); return; }
-    showScreen('screen-student-waiting');
+    // The ws broadcast of 'game_restarted' will show the design screen
+    // for all players in the session automatically.
 }
 
 // ── Settings ───────────────────────────────────────────
