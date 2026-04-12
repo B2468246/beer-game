@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=27">
+<link rel="stylesheet" href="/static/style.css?v=28">
 </head>
 <body>
 
@@ -842,11 +842,16 @@
 <div class="screen" id="screen-prof-results">
     <div class="card" id="profPrizesCard" style="display:none">
         <h2>&#127942; Prizes</h2>
+        <p class="text-muted text-sm mb-8" id="profPrizesCumNote" style="display:none">Cumulative across all games played</p>
         <div id="profPrizes" class="mt-12"></div>
     </div>
     <div class="card">
-        <h2>Final Results</h2>
+        <h2>Final Results <span class="text-muted text-sm" id="profLeaderboardNote" style="font-weight:400"></span></h2>
         <div id="finalLeaderboard" class="mt-12"></div>
+    </div>
+    <div class="card mt-16" id="profThisGameCard" style="display:none">
+        <h2>🎯 This Game's Performance <span class="text-muted text-sm" style="font-weight:400" id="profThisGameLabel"></span></h2>
+        <div id="profThisGameBody"></div>
     </div>
     <div class="card mt-16" id="profBullwhipCard" style="display:none">
         <h2>📊 Bullwhip Effect</h2>
@@ -1572,11 +1577,18 @@
     </div>
     <div class="card mt-16" id="studentPrizesCard" style="display:none">
         <h2>&#127942; Prizes</h2>
+        <p class="text-muted text-sm mb-8" id="studentPrizesCumNote" style="display:none">Cumulative across all games played</p>
         <div id="studentPrizes" class="mt-12"></div>
     </div>
     <div class="card mt-16">
-        <h2>Class Leaderboard</h2>
+        <h2>Class Leaderboard <span class="text-muted text-sm" id="studentLeaderboardNote" style="font-weight:400"></span></h2>
         <div id="studentLeaderboard"></div>
+    </div>
+
+    <!-- This Game's Performance (per team) -->
+    <div class="card mt-16" id="studentThisGameCard" style="display:none">
+        <h2>🎯 This Game's Performance <span class="text-muted text-sm" style="font-weight:400" id="studentThisGameLabel"></span></h2>
+        <div id="studentThisGameBody"></div>
     </div>
 
     <div class="card mt-16" id="studentBullwhipCard" style="display:none">
@@ -2494,23 +2506,41 @@ function renderBullwhip(bullwhip, teams, containerId, cardId) {
 }
 
 function handleGameFinished(msg) {
+    const gameNum = msg.game_num || 1;
+    const isMultiGame = gameNum > 1;
+    const leaderboardTeams = isMultiGame ? (msg.cumulative_teams || msg.teams) : msg.teams;
+
     if (!APP.isStudent) {
         showScreen('screen-prof-results');
-        renderFinalResults(msg.teams);
+        renderFinalResults(leaderboardTeams);
         renderPrizes(msg.prizes, 'profPrizes', 'profPrizesCard');
         renderBullwhip(msg.bullwhip, msg.teams, 'profBullwhipBody', 'profBullwhipCard');
+        // Cumulative note
+        if (isMultiGame) {
+            const note = document.getElementById('profLeaderboardNote');
+            if (note) note.textContent = `(cumulative — ${gameNum} games)`;
+            const cn = document.getElementById('profPrizesCumNote');
+            if (cn) cn.style.display = '';
+        }
+        renderThisGamePerformance(msg.teams, 'profThisGameBody', 'profThisGameCard', 'profThisGameLabel', gameNum);
     } else {
         // Pre-render the results screen silently so everything is ready
         // behind the peek modal.
-        renderStudentResults(msg);
+        renderStudentResults(msg, leaderboardTeams, gameNum);
         renderPrizes(msg.prizes, 'studentPrizes', 'studentPrizesCard');
         renderBullwhip(msg.bullwhip, msg.teams, 'studentBullwhipBody', 'studentBullwhipCard');
+        if (isMultiGame) {
+            const cn = document.getElementById('studentPrizesCumNote');
+            if (cn) cn.style.display = '';
+        }
+        renderThisGamePerformance(msg.teams, 'studentThisGameBody', 'studentThisGameCard', 'studentThisGameLabel', gameNum);
+
         fetchState().then(s => {
             const roleData = (s.rounds_data && APP.teamId) ? s.rounds_data[APP.teamId] : null;
-            if (roleData) renderReasoningArchive(roleData);
-            // Team Summary on results screen — charts + tables grouped by game
-            const myTeam = (msg.teams || []).find(t => t.id === APP.teamId);
-            if (myTeam) renderStudentTeamSummary(myTeam, roleData, s.total_rounds);
+            // Combine history + current game for team summary and reasoning
+            const allGames = buildAllGamesData(s, msg.teams);
+            renderStudentTeamSummary(null, null, null, allGames);
+            renderReasoningArchive(null, allGames);
         }).catch(() => {});
 
         // Show peek modal with the student's team summary BEFORE throwing
@@ -2518,6 +2548,62 @@ function handleGameFinished(msg) {
         const myTeam = (msg.teams || []).find(t => t.id === APP.teamId);
         showGameOverPeek(myTeam);
     }
+}
+
+function buildAllGamesData(stateData, currentTeams) {
+    const games = [];
+    const history = stateData.game_history || [];
+    // Historical games
+    for (const entry of history) {
+        const rd = entry.rounds_data && APP.teamId ? entry.rounds_data[APP.teamId] : null;
+        const ts = (entry.teams_summary || []).find(t => t.id === APP.teamId);
+        if (rd || ts) {
+            games.push({
+                gameNum: entry.game_num || (games.length + 1),
+                roleData: rd,
+                team: ts,
+                totalRounds: entry.total_rounds,
+            });
+        }
+    }
+    // Current game
+    const currentRd = stateData.rounds_data && APP.teamId ? stateData.rounds_data[APP.teamId] : null;
+    const currentTeam = (currentTeams || []).find(t => t.id === APP.teamId);
+    if (currentRd || currentTeam) {
+        games.push({
+            gameNum: games.length + 1,
+            roleData: currentRd,
+            team: currentTeam,
+            totalRounds: stateData.total_rounds,
+        });
+    }
+    return games;
+}
+
+function renderThisGamePerformance(teams, bodyId, cardId, labelId, gameNum) {
+    const body = document.getElementById(bodyId);
+    const card = document.getElementById(cardId);
+    const label = document.getElementById(labelId);
+    if (!body || !card || !teams || !teams.length) return;
+    if (label) label.textContent = `(Game ${gameNum})`;
+    card.style.display = '';
+    const sorted = [...teams].sort((a, b) => teamScore(a) - teamScore(b));
+    body.innerHTML = sorted.map((team, i) => {
+        const rolesHtml = team.roles.map(r =>
+            `<div class="flex justify-between" style="padding:3px 0;font-size:14px">
+                <span><span class="role-badge ${r.role}">${r.role}</span> ${escapeHtml(r.player_name)}</span>
+                <strong>${roleScore(r).toFixed(2)} EUR</strong>
+            </div>`
+        ).join('');
+        const isMe = team.id === APP.teamId;
+        return `<div class="card mb-12" style="box-shadow:none;border:1px solid var(--border);${isMe ? 'background:#FEFCF3' : ''}">
+            <div class="flex justify-between items-center mb-8">
+                <strong>${escapeHtml(team.name)}</strong>
+                <span style="color:#E67E22;font-weight:800;font-size:18px">${teamScore(team).toFixed(2)} EUR</span>
+            </div>
+            ${rolesHtml}
+        </div>`;
+    }).join('');
 }
 
 // ── Game-Over Peek (brief team summary before results screen) ──
@@ -2570,15 +2656,15 @@ function toggleStudentTeamSummary() {
 // canvases only draw once they have real layout dimensions.
 window.__pendingTeamCharts = window.__pendingTeamCharts || {};
 
-function renderStudentTeamSummary(team, roleData, totalRounds) {
+function renderStudentTeamSummary(team, roleData, totalRounds, allGames) {
     const body = document.getElementById('studentTeamSummaryBody');
     if (!body) return;
 
-    // For now only a single game is persisted at a time → game 1. Wire
-    // the structure up per-game so game 2, 3, … can be added later.
-    const games = [{ gameNum: 1, team, roleData, totalRounds }];
+    // Support multi-game: allGames is an array of {gameNum, team, roleData, totalRounds}
+    const games = allGames || [{ gameNum: 1, team, roleData, totalRounds }];
 
     body.innerHTML = games.map(g => {
+        if (!g.team) return '';
         const inner = renderTeamGameInner(g.gameNum, g.team);
         return renderGameGroup('team', g.gameNum, inner);
     }).join('');
@@ -2586,6 +2672,7 @@ function renderStudentTeamSummary(team, roleData, totalRounds) {
     // Stash data per game so the charts can be drawn when the game
     // group is expanded (canvases inside a hidden block have zero size).
     games.forEach(g => {
+        if (!g.team) return;
         window.__pendingTeamCharts[`team-game-${g.gameNum}`] = {
             roleData: g.roleData,
             totalRounds: g.totalRounds,
@@ -2721,34 +2808,40 @@ function toggleReasoningArchive() {
     if (arrow) arrow.innerHTML = open ? '&#9656;' : '&#9662;';
 }
 
-function renderReasoningArchive(roleData) {
+function renderReasoningArchive(roleData, allGames) {
     const body = document.getElementById('reasoningArchiveBody');
     if (!body) return;
     const ROLES_ORDER = ['Retailer', 'Wholesaler', 'Distributor', 'Manufacturer'];
-    const roles = ROLES_ORDER.filter(r => roleData[r] && roleData[r].length);
-    if (!roles.length) { body.innerHTML = '<p class="text-muted">No reasoning recorded.</p>'; return; }
-    const maxRound = Math.max(...roles.map(r => roleData[r].length));
 
-    // Build round-by-round content in the original flat format
-    let inner = '';
-    for (let i = 0; i < maxRound; i++) {
-        inner += `<div class="reasoning-round"><div class="reasoning-round-head">Round ${i + 1}</div>`;
-        for (const role of roles) {
-            const r = roleData[role][i];
-            if (!r) continue;
-            const reasoning = (r.reasoning || '').toString();
-            inner += `<div class="reasoning-entry">
-                <div class="reasoning-role"><span class="role-badge ${role.toLowerCase()}">${role}</span> ordered <strong>${r.order}</strong></div>
-                <div class="reasoning-text">${escapeHtml(reasoning)}</div>
-            </div>`;
+    function buildGameReasoning(rd, gameNum) {
+        if (!rd) return '';
+        const roles = ROLES_ORDER.filter(r => rd[r] && rd[r].length);
+        if (!roles.length) return '';
+        const maxRound = Math.max(...roles.map(r => rd[r].length));
+        let inner = '';
+        for (let i = 0; i < maxRound; i++) {
+            inner += `<div class="reasoning-round"><div class="reasoning-round-head">Round ${i + 1}</div>`;
+            for (const role of roles) {
+                const r = rd[role][i];
+                if (!r) continue;
+                const reasoning = (r.reasoning || '').toString();
+                inner += `<div class="reasoning-entry">
+                    <div class="reasoning-role"><span class="role-badge ${role.toLowerCase()}">${role}</span> ordered <strong>${r.order}</strong></div>
+                    <div class="reasoning-text">${escapeHtml(reasoning)}</div>
+                </div>`;
+            }
+            inner += '</div>';
         }
-        inner += '</div>';
+        return renderGameGroup('reas', gameNum, inner);
     }
 
-    // Wrap in a Game-level collapsible group. (Currently only the latest
-    // game's data is persisted, so this renders as "Game 1". When history
-    // is added, Game 2, Game 3, ... will appear above it.)
-    body.innerHTML = renderGameGroup('reas', 1, inner);
+    if (allGames && allGames.length) {
+        body.innerHTML = allGames.map(g => buildGameReasoning(g.roleData, g.gameNum)).join('');
+    } else if (roleData) {
+        body.innerHTML = buildGameReasoning(roleData, 1);
+    } else {
+        body.innerHTML = '<p class="text-muted">No reasoning recorded.</p>';
+    }
 }
 
 // ── Game-level collapsible group (shared by reasoning archive + team summary) ──
@@ -3853,12 +3946,19 @@ function switchRole(role) {
 }
 
 // ── Student: Results ───────────────────────────────────
-function renderStudentResults(msg) {
-    const myTeam = msg.teams.find(t => t.id === APP.teamId);
-    const rank = myTeam ? msg.teams.indexOf(myTeam) + 1 : '?';
+function renderStudentResults(msg, leaderboardTeams, gameNum) {
+    const teams = leaderboardTeams || msg.teams;
+    const isMultiGame = (gameNum || 1) > 1;
+    const myTeam = teams.find(t => t.id === APP.teamId);
+    const rank = myTeam ? teams.indexOf(myTeam) + 1 : '?';
+    const costLabel = isMultiGame ? 'cumulative' : 'total';
     document.getElementById('studentFinalRank').innerHTML = `
         <div class="counter">#${rank}</div>
-        <p class="mt-8" style="font-size:18px">${myTeam ? myTeam.name : ''} — ${myTeam ? teamScore(myTeam).toFixed(2) : '?'} EUR</p>`;
+        <p class="mt-8" style="font-size:18px">${myTeam ? myTeam.name : ''} — ${myTeam ? teamScore(myTeam).toFixed(2) : '?'} EUR ${isMultiGame ? '<span class="text-muted text-sm">(cumulative)</span>' : ''}</p>`;
+
+    // Leaderboard note
+    const note = document.getElementById('studentLeaderboardNote');
+    if (note && isMultiGame) note.textContent = `(cumulative — ${gameNum} games)`;
 
     // Play-again button: show only if student still has games left
     fetchState().then(s => {
@@ -3876,9 +3976,9 @@ function renderStudentResults(msg) {
         }
     }).catch(() => {});
 
-    // Leaderboard
+    // Leaderboard (cumulative)
     const container = document.getElementById('studentLeaderboard');
-    container.innerHTML = msg.teams.map((team, i) => {
+    container.innerHTML = teams.map((team, i) => {
         const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
         const isMe = team.id === APP.teamId;
         return `<div class="leaderboard-item" style="${isMe ? 'background:#EBF5FB' : ''}">

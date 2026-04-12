@@ -58,6 +58,7 @@ def make_empty_session(session_id: str, name: str = "") -> dict:
         "players": {},
         "teams": [],
         "rounds_data": {},
+        "game_history": [],  # list of completed game snapshots
         "current_round": 0,
         "demand_sequence": [],
         "created_at": time.time(),
@@ -585,11 +586,15 @@ async def run_game():
     state["phase"] = "finished"
     save_state()
     summaries = get_teams_summary()
+    cumulative = get_cumulative_teams_summary()
+    game_num = len(state.get("game_history", [])) + 1
     await broadcast({
         "type": "game_finished",
         "teams": summaries,
+        "cumulative_teams": cumulative,
+        "game_num": game_num,
         "bullwhip": compute_bullwhip(team_states),
-        "prizes": compute_prizes(summaries),
+        "prizes": compute_prizes(cumulative),  # prizes based on cumulative
     })
 
 
@@ -797,7 +802,7 @@ def compute_bullwhip(team_states: dict) -> dict:
 
 
 def get_teams_summary() -> list[dict]:
-    """Build a summary of all teams."""
+    """Build a summary of all teams (current game only)."""
     summaries = []
     for team in state["teams"]:
         roles_info = []
@@ -829,6 +834,62 @@ def get_teams_summary() -> list[dict]:
     # Sort by total cost (lower is better)
     summaries.sort(key=lambda t: t["scored_cost"])
     return summaries
+
+
+def get_cumulative_teams_summary() -> list[dict]:
+    """Build a leaderboard with costs summed across ALL games (history + current)."""
+    # Accumulate historical costs per team
+    history = state.get("game_history", [])
+    team_cumulative: dict[str, float] = {}       # team_id -> total cost
+    team_role_cumulative: dict[str, dict] = {}   # team_id -> {role -> cost}
+    for entry in history:
+        for ts in entry.get("teams_summary", []):
+            tid = ts["id"]
+            team_cumulative[tid] = team_cumulative.get(tid, 0.0) + ts["total_cost"]
+            if tid not in team_role_cumulative:
+                team_role_cumulative[tid] = {}
+            for r in ts.get("roles", []):
+                team_role_cumulative[tid][r["role"]] = team_role_cumulative[tid].get(r["role"], 0.0) + r["cost"]
+
+    # Add current game costs
+    current = get_teams_summary()
+    for ts in current:
+        tid = ts["id"]
+        team_cumulative[tid] = team_cumulative.get(tid, 0.0) + ts["total_cost"]
+        if tid not in team_role_cumulative:
+            team_role_cumulative[tid] = {}
+        for r in ts.get("roles", []):
+            team_role_cumulative[tid][r["role"]] = team_role_cumulative[tid].get(r["role"], 0.0) + r["cost"]
+
+    # Build cumulative summaries using current team structure
+    cumulative = []
+    for ts in current:
+        tid = ts["id"]
+        cum_roles = []
+        for r in ts["roles"]:
+            cum_cost = round(team_role_cumulative.get(tid, {}).get(r["role"], r["cost"]), 2)
+            cum_roles.append({**r, "cost": cum_cost, "scored_cost": cum_cost})
+        cum_total = round(team_cumulative.get(tid, ts["total_cost"]), 2)
+        cumulative.append({**ts, "total_cost": cum_total, "scored_cost": cum_total, "roles": cum_roles})
+    cumulative.sort(key=lambda t: t["scored_cost"])
+    return cumulative
+
+
+def archive_current_game():
+    """Snapshot the current game's results into game_history before resetting."""
+    if not state["rounds_data"]:
+        return  # nothing to archive
+    if "game_history" not in state:
+        state["game_history"] = []
+    game_num = len(state["game_history"]) + 1
+    summaries = get_teams_summary()
+    # Store a lightweight snapshot (rounds_data per team + summary)
+    state["game_history"].append({
+        "game_num": game_num,
+        "rounds_data": state["rounds_data"],
+        "teams_summary": summaries,
+        "total_rounds": state["settings"]["rounds"],
+    })
 
 
 def compute_prizes(summaries: list[dict]) -> dict:
@@ -1281,6 +1342,7 @@ async def begin_game():
 @app.post("/api/restart")
 async def restart_game():
     """Same teams, go back to agent design."""
+    archive_current_game()
     state["phase"] = "designing"
     state["current_round"] = 0
     state["rounds_data"] = {}
@@ -1306,6 +1368,7 @@ async def restart_game():
 @app.post("/api/new-game")
 async def new_game():
     """Full reset to lobby."""
+    archive_current_game()
     state["phase"] = "lobby"
     state["teams"] = []
     state["rounds_data"] = {}
@@ -1407,6 +1470,8 @@ async def get_state(player_id: Optional[str] = None):
         teams_info.append({"id": team["id"], "name": team["name"], "members": members, "role_map": team["role_map"]})
 
     summaries = get_teams_summary() if state["rounds_data"] else []
+    cumulative = get_cumulative_teams_summary() if state["rounds_data"] else []
+    game_num = len(state.get("game_history", [])) + (1 if state["rounds_data"] else 0)
 
     # Privacy: students only get rounds_data for THEIR own team. Other teams'
     # per-round detail (orders, reasoning, inventory) stays server-side. The
@@ -1414,8 +1479,14 @@ async def get_state(player_id: Optional[str] = None):
     own_team_id = _team_id_for_player(player_id) if player_id else None
     if player_id:
         rounds_data_out = {own_team_id: state["rounds_data"].get(own_team_id, {})} if own_team_id else {}
+        # Filter game_history to only include this player's team data
+        history_out = []
+        for entry in state.get("game_history", []):
+            filtered_rd = {own_team_id: entry["rounds_data"].get(own_team_id, {})} if own_team_id else {}
+            history_out.append({**entry, "rounds_data": filtered_rd})
     else:
         rounds_data_out = state["rounds_data"]
+        history_out = state.get("game_history", [])
 
     return {
         "phase": state["phase"],
@@ -1426,8 +1497,11 @@ async def get_state(player_id: Optional[str] = None):
         "current_round": state["current_round"],
         "total_rounds": state["settings"]["rounds"],
         "rounds_data": rounds_data_out,
+        "game_history": history_out,
+        "game_num": game_num,
         "teams_summary": summaries,
-        "prizes": compute_prizes(summaries) if state["phase"] == "finished" else None,
+        "cumulative_teams": cumulative,
+        "prizes": compute_prizes(cumulative) if state["phase"] == "finished" else None,
     }
 
 
