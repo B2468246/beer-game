@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=18">
+<link rel="stylesheet" href="/static/style.css?v=19">
 </head>
 <body>
 
@@ -2900,12 +2900,12 @@ const BUILDING_POS = {
     Customer:     { x: 170,  y: 420 },
 };
 
-// Info card positions (offset from buildings)
+// Info card positions (next to buildings, always within 1800x1000 viewBox)
 const CARD_POS = {
-    Retailer:     { x: 500,  y: 140, w: 200, h: 200 },
-    Wholesaler:   { x: 1100, y: 140, w: 200, h: 200 },
-    Distributor:  { x: 500,  y: 640, w: 200, h: 200 },
-    Manufacturer: { x: 1100, y: 640, w: 200, h: 200 },
+    Retailer:     { x: 480,  y: 140, w: 220, h: 210 },
+    Wholesaler:   { x: 1100, y: 140, w: 220, h: 210 },
+    Distributor:  { x: 100,  y: 520, w: 220, h: 210 },
+    Manufacturer: { x: 850,  y: 520, w: 220, h: 210 },
 };
 
 // Road segment mapping:
@@ -3104,14 +3104,23 @@ function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
         custG.setAttribute('opacity', role === 'Retailer' ? '1' : '0.45');
     }
 
-    // ── Update info cards ──
+    // ── Update info cards (only show for player's own roles) ──
     const cardsG = document.getElementById('info-cards');
     if (cardsG) {
         cardsG.textContent = '';
+        // Determine which roles this player controls
+        const myRoles = APP.roles || [];
+        const isSolo = myRoles.length === 4; // player controls all 4 roles
+
         stages.forEach(s => {
             const cp = CARD_POS[s];
             if (!cp) return;
             const isMe = s === role;
+
+            // Only show info card for player's own roles
+            // If solo (all 4 agents), show all; otherwise only the active role
+            if (!isSolo && !myRoles.includes(s)) return;
+
             const d = stageData[s].last;
 
             const fo = document.createElementNS(SVG_NS, 'foreignObject');
@@ -3119,7 +3128,8 @@ function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
             fo.setAttribute('y', cp.y);
             fo.setAttribute('width', cp.w);
             fo.setAttribute('height', cp.h);
-            fo.setAttribute('opacity', isMe ? '1' : '0.45');
+            // If solo, dim non-active cards slightly
+            fo.setAttribute('opacity', (!isSolo || isMe) ? '1' : '0.7');
 
             const div = document.createElementNS(XHTML_NS, 'div');
             div.setAttribute('xmlns', XHTML_NS);
