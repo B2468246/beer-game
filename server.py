@@ -619,12 +619,15 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
 
     # Process each role and collect AI calls
     ai_tasks = []
+    round_incoming = {}   # role -> incoming shipment this round
+    round_shipped = {}    # role -> units shipped this round
     for role in ROLES:
         rs = ts[role]
 
         # 1. Receive incoming shipment (front of pipeline)
         incoming = rs["pipeline"].pop(0) if rs["pipeline"] else 0
         rs["inventory"] += incoming
+        round_incoming[role] = incoming
 
         # 2. Process demand: fulfill from inventory, remainder becomes backlog
         demand = demands[role]
@@ -633,6 +636,7 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
         shipped = min(rs["inventory"], total_demand)
         rs["inventory"] -= shipped
         rs["backlog"] = total_demand - shipped
+        round_shipped[role] = shipped
 
         # Build round data for AI
         rd = {
@@ -698,8 +702,6 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
         rs["cumulative_cost"] += round_cost
 
         # Save round data
-        incoming = 0
-        prev = state["rounds_data"][team["id"]][role]
         state["rounds_data"][team["id"]][role].append({
             "round": round_num,
             "demand": demand,
@@ -707,13 +709,13 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             "backlog": rs["backlog"],
             "pipeline": sum(rs["pipeline"]),
             "pipeline_detail": list(rs["pipeline"]),
-            "shipped": shipped,
+            "shipped": round_shipped[role],
             "outstanding": rs["outstanding"],
             "order": order,
             "cost": round_cost,
             "cumulative_cost": rs["cumulative_cost"],
             "reasoning": reasoning,
-            "incoming_shipment": incoming,
+            "incoming_shipment": round_incoming[role],
         })
 
 
@@ -1391,6 +1393,7 @@ async def kick_all_players():
     state["players"] = {}
     state["teams"] = []
     state["rounds_data"] = {}
+    state["game_history"] = []
     state["current_round"] = 0
     state["phase"] = "lobby"
     save_state()
@@ -1412,11 +1415,8 @@ async def export_csv():
         role_map = team.get("role_map", {})
         rd = state.get("rounds_data", {}).get(tid, {})
         for role in ROLES:
-            player_name = ""
-            for pid, r in role_map.items():
-                if r == role:
-                    player_name = state["players"].get(pid, {}).get("name", pid)
-                    break
+            pid = role_map.get(role, "")
+            player_name = state["players"].get(pid, {}).get("name", pid) if pid else ""
             for entry in rd.get(role, []):
                 writer.writerow([
                     team["name"], role, player_name,
