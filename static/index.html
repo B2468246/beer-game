@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=25">
+<link rel="stylesheet" href="/static/style.css?v=26">
 </head>
 <body>
 
@@ -2881,56 +2881,27 @@ function buildDesignScreenFromTeam(team, allTeams) {
     }).join('<br>');
     infoDiv.innerHTML = `<h2>${team.name}</h2><div class="text-sm mt-8">${teammates}</div>`;
 
-    // Strategy pickers
+    // Strategy pickers — free-text prompt per role
     const pickers = document.getElementById('strategyPickers');
     pickers.innerHTML = '';
     for (const role of APP.roles) {
-        const id = `strat-${role}`;
         pickers.innerHTML += `
         <div class="mb-20">
-            <h3><span class="role-badge ${role}">${role}</span> Strategy</h3>
-            <div class="strategy-options" id="${id}">
-                ${strategyOption(role, 'rational', 'Rational', 'Minimize YOUR OWN costs only.')}
-                ${strategyOption(role, 'cooperative', 'Cooperative', 'Minimize TOTAL team costs.')}
-                ${strategyOption(role, 'base_stock', 'Base-Stock', 'Deterministic formula (no AI).')}
-                ${strategyOption(role, 'custom', 'Custom', 'Write your own AI instructions.')}
-            </div>
-            <div id="custom-input-${role}" style="display:none" class="mt-8">
-                <textarea id="custom-prompt-${role}" placeholder="e.g. Be conservative early. After round 5, order the average of last 3 demands plus 2 extra."></textarea>
-            </div>
+            <h3><span class="role-badge ${role}">${role}</span> — Design Your Agent</h3>
+            <p class="hint mt-4 mb-8">Write instructions that tell your AI agent how to decide order quantities each round.</p>
+            <textarea id="custom-prompt-${role}" class="strategy-textarea" placeholder="e.g. Order exactly what was demanded. / Keep a safety stock of 5 units above expected demand. / Be conservative for the first 4 rounds, then match the average of the last 3 demands plus 2 extra."></textarea>
         </div>`;
     }
-
-    // Add click handlers
-    document.querySelectorAll('.strategy-option').forEach(el => {
-        el.addEventListener('click', () => {
-            const role = el.dataset.role;
-            const val = el.dataset.value;
-            document.querySelectorAll(`#strat-${role} .strategy-option`).forEach(o => o.classList.remove('selected'));
-            el.classList.add('selected');
-            el.querySelector('input').checked = true;
-            document.getElementById(`custom-input-${role}`).style.display = val === 'custom' ? '' : 'none';
-        });
-    });
-}
-
-function strategyOption(role, value, label, desc) {
-    return `<div class="strategy-option" data-role="${role}" data-value="${value}">
-        <input type="radio" name="strategy-${role}" value="${value}">
-        <div class="strat-info"><h4>${label}</h4><p>${desc}</p></div>
-    </div>`;
 }
 
 async function lockIn() {
     const strategies = {};
     const custom_prompts = {};
     for (const role of APP.roles) {
-        const selected = document.querySelector(`input[name="strategy-${role}"]:checked`);
-        if (!selected) { alert(`Please select a strategy for ${role}`); return; }
-        strategies[role] = selected.value;
-        if (selected.value === 'custom') {
-            custom_prompts[role] = document.getElementById(`custom-prompt-${role}`).value;
-        }
+        const prompt = document.getElementById(`custom-prompt-${role}`).value.trim();
+        if (!prompt) { alert(`Please write a strategy for ${role}`); return; }
+        strategies[role] = 'custom';
+        custom_prompts[role] = prompt;
     }
     const result = await api('/api/lock-in', { player_id: APP.playerId, strategies, custom_prompts });
     if (result.error) { alert(result.error); return; }

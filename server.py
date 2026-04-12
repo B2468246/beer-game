@@ -334,10 +334,7 @@ IMPORTANT OUTPUT FORMAT:
 - After that line, explain your reasoning in as much detail as you want.
 - Never omit the ORDER line — it is parsed automatically."""
 
-OBJECTIVES = {
-    "rational": "Objective: Minimize YOUR OWN cumulative costs only. Other stages are irrelevant to you - optimize exclusively your own inventory and backlog cost balance.",
-    "cooperative": "Objective: Minimize the TOTAL COSTS OF ALL FOUR stages over all rounds. The chain is evaluated as a team - even if your own stage performs worse as a result.",
-}
+DEFAULT_OBJECTIVE = "Objective: Minimize your cumulative costs by balancing inventory holding costs and backlog penalty costs. Use the student's custom instructions below to guide your ordering strategy."
 
 
 async def call_claude(api_key: str, system_prompt: str, user_message: str) -> tuple[int, str]:
@@ -647,32 +644,21 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
         # Get player's strategy for this role
         player_id = team["role_map"][role]
         player = state["players"][player_id]
-        strat = player["strategies"].get(role, "rational")
         custom_prompt = player.get("custom_prompts", {}).get(role, "")
 
         history = state["rounds_data"][team["id"]][role]
 
-        if strat == "base_stock":
-            order = base_stock_order(history, lead_time)
-            reasoning = f"[Base-Stock formula] Calculated order: {order}"
-            async def _bs(o=order, r=reasoning): return (o, r)
-            ai_tasks.append((role, _bs()))
-        else:
-            # Build prompts
-            if strat == "custom" and custom_prompt:
-                objective = f"Objective (custom instructions from student): {custom_prompt}"
-            else:
-                objective = OBJECTIVES.get(strat, OBJECTIVES["rational"])
+        objective = f"Objective (custom instructions from student): {custom_prompt}" if custom_prompt else DEFAULT_OBJECTIVE
 
-            sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-                rounds=settings["rounds"],
-                lead_time=lead_time,
-                holding_cost=settings["holding_cost"],
-                backlog_cost=settings["backlog_cost"],
-                objective=objective,
-            )
-            user_msg = build_user_message(role, round_num, rd, history)
-            ai_tasks.append((role, call_claude(api_key_global or "", sys_prompt, user_msg)))
+        sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            rounds=settings["rounds"],
+            lead_time=lead_time,
+            holding_cost=settings["holding_cost"],
+            backlog_cost=settings["backlog_cost"],
+            objective=objective,
+        )
+        user_msg = build_user_message(role, round_num, rd, history)
+        ai_tasks.append((role, call_claude(api_key_global or "", sys_prompt, user_msg)))
 
     # Run all AI calls concurrently
     results = {}
@@ -1129,13 +1115,11 @@ async def lock_in(body: dict):
         return JSONResponse({"error": "Not in design phase"}, status_code=400)
 
     player = state["players"][player_id]
-    strategies = body.get("strategies", {})
     custom_prompts = body.get("custom_prompts", {})
 
     for role in player["roles"]:
-        player["strategies"][role] = strategies.get(role, "rational")
-        if strategies.get(role) == "custom":
-            player["custom_prompts"][role] = custom_prompts.get(role, "")
+        player["strategies"][role] = "custom"
+        player["custom_prompts"][role] = custom_prompts.get(role, "")
 
     player["locked_in"] = True
     save_state()
