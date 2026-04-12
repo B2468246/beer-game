@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beer Game — How to Play (AI Agent Mode)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0F1923;--card:#1A2736;--card2:#223344;
+    --text:#E8ECF1;--muted:#8899AA;
+    --accent:#42A5F5;--accent2:#AB47BC;
+    --ret:#FF7043;--who:#66BB6A;--dis:#42A5F5;--man:#AB47BC;
+    --ret-bg:#2A1A15;--who-bg:#1A2A1A;--dis-bg:#152030;--man-bg:#251A30;
+    --green:#27AE60;--red:#E74C3C;--orange:#E67E22;
+  }
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
+
+  .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 40%,rgba(66,165,245,.08) 0%,transparent 50%),radial-gradient(circle at 70% 60%,rgba(171,71,188,.06) 0%,transparent 50%);animation:bgpulse 8s ease-in-out infinite alternate}
+  @keyframes bgpulse{0%{transform:scale(1) rotate(0deg)}100%{transform:scale(1.1) rotate(2deg)}}
+  .hero h1{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:800;letter-spacing:-.02em;margin-bottom:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero .sub{font-size:clamp(1rem,2.5vw,1.5rem);color:var(--muted);max-width:620px;margin-bottom:40px}
+  .hero .mode-badge{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid rgba(66,165,245,.3);border-radius:100px;padding:10px 24px;font-size:15px;color:var(--accent);font-weight:600;margin-bottom:32px}
+  .hero .mode-badge .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+  .scroll-hint{position:absolute;bottom:40px;color:var(--muted);font-size:14px;animation:bounce 2s infinite}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(8px)}}
+  .scroll-hint svg{display:block;margin:8px auto 0;width:24px;height:24px;stroke:var(--muted);fill:none;stroke-width:2}
+
+  .steps{max-width:800px;margin:0 auto;padding:0 20px 80px}
+  .step{position:relative;padding:60px 0;opacity:0;transform:translateY(40px);transition:all .6s cubic-bezier(.16,1,.3,1)}
+  .step.visible{opacity:1;transform:translateY(0)}
+  .step-num{position:absolute;top:50px;left:-60px;font-size:120px;font-weight:900;color:rgba(66,165,245,.06);line-height:1;pointer-events:none;user-select:none}
+  @media(max-width:900px){.step-num{position:static;font-size:64px;margin-bottom:-20px}}
+  .step h2{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:12px}
+  .step h2 .num{background:var(--accent);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+  .step p{color:var(--muted);font-size:17px;max-width:640px;margin-bottom:20px}
+
+  .mockup{background:var(--card);border-radius:16px;padding:24px;margin:20px 0;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+  .mockup::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .mockup-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:16px}
+
+  .role{display:inline-block;padding:4px 14px;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:.3px}
+  .role.ret{color:var(--ret);background:var(--ret-bg)}
+  .role.who{color:var(--who);background:var(--who-bg)}
+  .role.dis{color:var(--dis);background:var(--dis-bg)}
+  .role.man{color:var(--man);background:var(--man-bg)}
+
+  .tip{background:rgba(66,165,245,.08);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:16px 20px;margin:16px 0;font-size:15px;color:var(--muted)}
+  .tip strong{color:var(--accent)}
+
+  .roles-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+  @media(max-width:600px){.roles-grid{grid-template-columns:1fr}}
+  .role-card{background:var(--card2);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.04)}
+  .role-card h4{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .role-card p{font-size:13px;color:var(--muted);line-height:1.5}
+
+  /* Strategy cards */
+  .strat-name{font-size:16px;font-weight:700;margin-bottom:4px}
+  .strat-desc{font-size:13px;color:var(--muted);line-height:1.5}
+  .custom-textarea{width:100%;min-height:80px;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none}
+  .custom-textarea:focus{border-color:var(--accent)}
+  .custom-textarea::placeholder{color:var(--muted);opacity:.6}
+
+  /* Lock-in / Ready */
+  .btn{padding:10px 24px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-green:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .btn-disabled{opacity:.4;pointer-events:none}
+
+  .progress-row{display:flex;align-items:center;gap:12px;margin:16px 0}
+  .progress-bar{flex:1;height:8px;background:var(--card2);border-radius:4px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s ease}
+  .progress-label{font-size:13px;color:var(--muted);white-space:nowrap}
+
+  .chain{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;padding:20px 0}
+  .chain-node{text-align:center;padding:12px 16px}
+  .chain-icon{font-size:32px;margin-bottom:4px}
+  .chain-label{font-size:12px;font-weight:700;letter-spacing:.5px}
+  .chain-arrow{color:var(--muted);font-size:24px;padding:0 4px}
+
+  /* Reasoning bubble */
+  .reasoning{background:var(--card2);border-radius:16px;padding:16px 20px;margin:12px 0;position:relative;border:1px solid rgba(255,255,255,.06)}
+  .reasoning::before{content:'';position:absolute;top:-8px;left:24px;width:16px;height:16px;background:var(--card2);border:1px solid rgba(255,255,255,.06);border-right:none;border-bottom:none;transform:rotate(45deg)}
+  .reasoning .agent-label{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  .reasoning .thought{font-size:14px;color:var(--muted);line-height:1.6;font-style:italic}
+  .reasoning .order-result{margin-top:10px;font-size:18px;font-weight:800;color:var(--text)}
+
+  .footer{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;border-top:1px solid rgba(255,255,255,.05)}
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="mode-badge"><span class="dot"></span> AI Agent Mode</div>
+  <h1>How to Play</h1>
+  <p class="sub">You don't place orders yourself — you design a strategy, and an AI agent executes it for you. Think like a manager, not an operator.</p>
+  <div class="scroll-hint">
+    Scroll to begin
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </div>
+</section>
+
+<!-- ═══ STEPS ═══ -->
+<div class="steps">
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-num">1</div>
+    <h2><span class="num">1</span> Join the Game</h2>
+    <p>Open the link your professor shares — in class, via QR code, or chat. Enter your name and hit <strong>Join</strong>. No account needed.</p>
+    <div class="mockup">
+      <div class="mockup-title">Join Screen</div>
+      <div style="max-width:320px">
+        <div style="background:var(--card2);border-radius:10px;padding:14px;margin-bottom:12px;color:var(--muted);font-size:15px">Your Name</div>
+        <button class="btn btn-primary" style="width:100%">Join Game</button>
+      </div>
+    </div>
+    <div class="tip"><strong>Tip:</strong> If you get disconnected, just rejoin with the same name — your progress is saved.</div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-num">2</div>
+    <h2><span class="num">2</span> Teams & Roles</h2>
+    <p>When the professor starts, you're assigned to a <strong>team of 4</strong> with a role in the supply chain. Each role buys from the one above it:</p>
+    <div class="roles-grid">
+      <div class="role-card">
+        <h4><span class="role ret">Retailer</span></h4>
+        <p>Sells beer to customers. Faces real consumer demand.</p>
+      </div>
+      <div class="role-card">
+        <h4><span class="role who">Wholesaler</span></h4>
+        <p>Supplies the Retailer. Sees only the Retailer's orders.</p>
+      </div>
+      <div class="role-card">
+        <h4><span class="role dis">Distributor</span></h4>
+        <p>Supplies the Wholesaler. One more step removed from the customer.</p>
+      </div>
+      <div class="role-card">
+        <h4><span class="role man">Manufacturer</span></h4>
+        <p>Produces the beer. Furthest from real demand — hardest to predict.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-num">3</div>
+    <h2><span class="num">3</span> The Supply Chain</h2>
+    <p>Beer flows from the Factory to the Customer. Orders flow the other way. Each shipment takes <strong>2 weeks</strong> to arrive.</p>
+    <div class="mockup">
+      <div class="chain">
+        <div class="chain-node"><div class="chain-icon">🏭</div><div class="chain-label" style="color:var(--man)">Factory</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🏗️</div><div class="chain-label" style="color:var(--dis)">Distributor</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🏬</div><div class="chain-label" style="color:var(--who)">Wholesaler</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🍺</div><div class="chain-label" style="color:var(--ret)">Retailer</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🧑</div><div class="chain-label">Customer</div></div>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:13px;margin-top:8px">
+        ← Orders flow this way &nbsp;|&nbsp; Beer flows that way →
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-num">4</div>
+    <h2><span class="num">4</span> Design Your Agent</h2>
+    <p>This is the key decision. For each role you're assigned, write instructions that tell your AI agent how to order beer each round. There are no presets — you design the strategy from scratch.</p>
+
+    <div class="mockup">
+      <div class="mockup-title">Your Role: <span class="role ret" style="margin-left:8px">Retailer</span> — Design Your Agent</div>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Write instructions that tell your AI agent how to decide order quantities each round.</p>
+      <textarea class="custom-textarea" id="demoPrompt" style="width:100%;min-height:120px" placeholder="e.g. Order exactly what was demanded. / Keep a safety stock of 5 units above expected demand. / Be conservative for the first 4 rounds, then match the average of the last 3 demands plus 2 extra."></textarea>
+    </div>
+
+    <p style="margin-top:16px">Some things to think about when writing your strategy:</p>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:12px 0;font-size:15px">
+      <span style="font-size:20px">📦</span><span style="color:var(--muted)">Should you order exactly what's demanded, or add a buffer?</span>
+      <span style="font-size:20px">⏳</span><span style="color:var(--muted)">Shipments take 2 weeks — how do you account for the delay?</span>
+      <span style="font-size:20px">📈</span><span style="color:var(--muted)">What if demand suddenly changes? React fast or stay steady?</span>
+      <span style="font-size:20px">💰</span><span style="color:var(--muted)">Holding stock costs €0.50/unit — backlog costs €1.00/unit. Which risk is worse?</span>
+    </div>
+
+    <div class="tip"><strong>Think carefully:</strong> Your strategy runs automatically for every round. You can't change it once the game starts. What sounds smart on paper might fail in practice — that's the point of the experiment!</div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-num">5</div>
+    <h2><span class="num">5</span> Lock In & Ready Up</h2>
+    <p>When you're happy with your strategy, hit <strong>Lock In</strong>. You can still go back and edit until you press <strong>Ready</strong>.</p>
+
+    <div class="mockup">
+      <div class="mockup-title">After Lock-In</div>
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:48px;margin-bottom:8px">✅</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px">Strategies Locked In!</div>
+        <div style="color:var(--muted);font-size:14px;margin-bottom:20px">Press Ready when you want the game to start.<br>The game begins once every player is ready.</div>
+        <button class="btn btn-green" id="demoReadyBtn" onclick="demoReady()" style="width:100%;max-width:360px;padding:14px;font-size:17px">I'm Ready — Start Game</button>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Lock-in:</span>
+        <div class="progress-bar"><div class="progress-fill" id="lockProgress" style="width:75%"></div></div>
+        <span class="progress-label" id="lockLabel">3 / 4</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Ready:</span>
+        <div class="progress-bar"><div class="progress-fill" id="readyProgress" style="width:25%"></div></div>
+        <span class="progress-label" id="readyLabel">1 / 4</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step">
+    <div class="step-num">6</div>
+    <h2><span class="num">6</span> Watch Your Agent Play</h2>
+    <p>The game runs automatically. Each round, your AI agent sees the current state — demand, inventory, backlog, pipeline — and decides how much to order based on your strategy.</p>
+    <p>You'll see reasoning bubbles showing what the agent is thinking:</p>
+
+    <div class="mockup">
+      <div class="mockup-title">Round 5 — Agent Decision</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span class="role ret">Retailer</span>
+        <span style="color:var(--muted);font-size:14px">Your Agent</span>
+      </div>
+      <div class="reasoning">
+        <div class="agent-label">AI Reasoning</div>
+        <div class="thought">"Demand jumped from 4 to 8 this round. I have 6 units in stock and 4 incoming. If I order 8, I'll have enough to cover next round's demand with a small buffer. Ordering more would build unnecessary inventory."</div>
+        <div class="order-result">📦 Order: 8 units</div>
+      </div>
+    </div>
+
+    <p>Trucks animate across the game board as deliveries move through the supply chain. Watch how orders amplify as they travel upstream — that's the Bullwhip Effect in action.</p>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="step">
+    <div class="step-num">7</div>
+    <h2><span class="num">7</span> The Goal</h2>
+    <p>Keep costs low. Every unit sitting in your warehouse costs <strong>€0.50/week</strong>. Every unit of backlog costs <strong>€1.00/week</strong>.</p>
+    <p>The best strategy balances responsiveness with stability. Over-reacting to demand changes creates the very chaos you're trying to avoid.</p>
+    <div class="mockup" style="text-align:center;padding:32px">
+      <div style="font-size:48px;margin-bottom:12px">🏆</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px">Best Team & Best Player</div>
+      <div style="color:var(--muted);font-size:15px">Lowest cumulative cost wins. Only scored rounds count (warmup rounds are excluded).</div>
+    </div>
+    <div class="tip"><strong>The twist:</strong> You designed the strategy — but you can't intervene once the game starts. Did your instructions cover edge cases? Did you account for the lead time? That's what makes this interesting.</div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Beer Distribution Game — AI Agent Mode Guide
+</div>
+
+<script>
+// Scroll reveal
+const steps = document.querySelectorAll('.step');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.15 });
+steps.forEach(s => obs.observe(s));
+
+// Strategy selection demo
+// Ready button demo
+function demoReady() {
+  const btn = document.getElementById('demoReadyBtn');
+  btn.textContent = '✓ You are Ready!';
+  btn.classList.add('btn-disabled');
+  btn.style.background = 'var(--muted)';
+  document.getElementById('readyProgress').style.width = '50%';
+  document.getElementById('readyLabel').textContent = '2 / 4';
+}
+</script>
+</body>
+</html>

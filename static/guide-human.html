@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beer Game — How to Play (Manual Mode)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0F1923;--card:#1A2736;--card2:#223344;
+    --text:#E8ECF1;--muted:#8899AA;
+    --accent:#FF7043;--accent2:#42A5F5;
+    --ret:#FF7043;--who:#66BB6A;--dis:#42A5F5;--man:#AB47BC;
+    --ret-bg:#2A1A15;--who-bg:#1A2A1A;--dis-bg:#152030;--man-bg:#251A30;
+    --green:#27AE60;--red:#E74C3C;--orange:#E67E22;
+  }
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
+
+  /* Hero */
+  .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 40%,rgba(255,112,67,.08) 0%,transparent 50%),radial-gradient(circle at 70% 60%,rgba(66,165,245,.06) 0%,transparent 50%);animation:bgpulse 8s ease-in-out infinite alternate}
+  @keyframes bgpulse{0%{transform:scale(1) rotate(0deg)}100%{transform:scale(1.1) rotate(2deg)}}
+  .hero h1{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:800;letter-spacing:-.02em;margin-bottom:12px;background:linear-gradient(135deg,var(--accent),#FF9A76);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero .sub{font-size:clamp(1rem,2.5vw,1.5rem);color:var(--muted);max-width:600px;margin-bottom:40px}
+  .hero .mode-badge{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid rgba(255,112,67,.3);border-radius:100px;padding:10px 24px;font-size:15px;color:var(--accent);font-weight:600;margin-bottom:32px}
+  .hero .mode-badge .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+  .scroll-hint{position:absolute;bottom:40px;color:var(--muted);font-size:14px;animation:bounce 2s infinite}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(8px)}}
+  .scroll-hint svg{display:block;margin:8px auto 0;width:24px;height:24px;stroke:var(--muted);fill:none;stroke-width:2}
+
+  /* Steps */
+  .steps{max-width:800px;margin:0 auto;padding:0 20px 80px}
+  .step{position:relative;padding:60px 0;opacity:0;transform:translateY(40px);transition:all .6s cubic-bezier(.16,1,.3,1)}
+  .step.visible{opacity:1;transform:translateY(0)}
+  .step-num{position:absolute;top:50px;left:-60px;font-size:120px;font-weight:900;color:rgba(255,112,67,.06);line-height:1;pointer-events:none;user-select:none}
+  @media(max-width:900px){.step-num{position:static;font-size:64px;margin-bottom:-20px}}
+  .step h2{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:12px}
+  .step h2 .num{background:var(--accent);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+  .step p{color:var(--muted);font-size:17px;max-width:640px;margin-bottom:20px}
+
+  /* Cards / Mockups */
+  .mockup{background:var(--card);border-radius:16px;padding:24px;margin:20px 0;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+  .mockup::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .mockup-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:16px}
+
+  /* Role badges */
+  .role{display:inline-block;padding:4px 14px;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:.3px}
+  .role.ret{color:var(--ret);background:var(--ret-bg)}
+  .role.who{color:var(--who);background:var(--who-bg)}
+  .role.dis{color:var(--dis);background:var(--dis-bg)}
+  .role.man{color:var(--man);background:var(--man-bg)}
+
+  /* Order card mockup */
+  .order-card{background:var(--card2);border-radius:12px;padding:20px;margin:8px 0;border:1px solid rgba(255,255,255,.04)}
+  .order-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:12px}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .stat-val{font-size:28px;font-weight:800;line-height:1.2}
+  .stat-val.demand{color:var(--orange)}
+  .stat-val.inv{color:var(--green)}
+  .stat-val.back{color:var(--red)}
+  .stat-val.zero{color:var(--muted)}
+  .meta-row{font-size:12px;color:var(--muted);display:flex;gap:12px;margin-bottom:16px}
+  .order-input{width:100%;padding:14px;border-radius:10px;border:2px solid rgba(255,255,255,.1);background:var(--bg);color:var(--text);font-size:24px;font-weight:700;text-align:center;outline:none;transition:border-color .2s}
+  .order-input:focus{border-color:var(--accent)}
+  .order-label{font-size:13px;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+
+  /* Interactive demo */
+  .demo-panel{background:var(--card);border:2px solid var(--accent);border-radius:16px;padding:24px;margin:20px 0}
+  .demo-panel h3{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .btn{padding:10px 24px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-outline{background:transparent;color:var(--accent);border:2px solid var(--accent)}
+  .btn-disabled{opacity:.4;pointer-events:none}
+
+  /* Waiting state */
+  .waiting{text-align:center;color:var(--muted);padding:16px 0;display:none}
+  .waiting .spinner{width:24px;height:24px;border:3px solid var(--card2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Supply chain visual */
+  .chain{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;padding:20px 0}
+  .chain-node{text-align:center;padding:12px 16px}
+  .chain-icon{font-size:32px;margin-bottom:4px}
+  .chain-label{font-size:12px;font-weight:700;letter-spacing:.5px}
+  .chain-arrow{color:var(--muted);font-size:24px;padding:0 4px}
+
+  /* Tip box */
+  .tip{background:rgba(66,165,245,.08);border-left:3px solid var(--accent2);border-radius:0 10px 10px 0;padding:16px 20px;margin:16px 0;font-size:15px;color:var(--muted)}
+  .tip strong{color:var(--accent2)}
+
+  /* Roles grid */
+  .roles-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+  @media(max-width:600px){.roles-grid{grid-template-columns:1fr}}
+  .role-card{background:var(--card2);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.04)}
+  .role-card h4{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .role-card p{font-size:13px;color:var(--muted);line-height:1.5}
+
+  /* Footer */
+  .footer{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;border-top:1px solid rgba(255,255,255,.05)}
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="mode-badge"><span class="dot"></span> Manual Play Mode</div>
+  <h1>How to Play</h1>
+  <p class="sub">You control the orders. Every round, you decide how much beer to order — based on real demand, your stock, and your gut feeling.</p>
+  <div class="scroll-hint">
+    Scroll to begin
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </div>
+</section>
+
+<!-- ═══ STEPS ═══ -->
+<div class="steps">
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-num">1</div>
+    <h2><span class="num">1</span> Join the Game</h2>
+    <p>Open the link your professor shares — in class, via QR code, or chat. Enter your name and hit <strong>Join</strong>. No account needed.</p>
+    <div class="mockup">
+      <div class="mockup-title">Join Screen</div>
+      <div style="max-width:320px">
+        <div style="background:var(--card2);border-radius:10px;padding:14px;margin-bottom:12px;color:var(--muted);font-size:15px">Your Name</div>
+        <button class="btn btn-primary" style="width:100%">Join Game</button>
+      </div>
+    </div>
+    <div class="tip"><strong>Tip:</strong> If you get disconnected, just rejoin with the same name — your progress is saved.</div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-num">2</div>
+    <h2><span class="num">2</span> Wait in the Lobby</h2>
+    <p>You'll see a waiting screen while other students join. The professor starts the game once everyone is in.</p>
+    <p>When the game starts, you're automatically assigned to a <strong>team of 4</strong> and given one (or two) roles in the supply chain:</p>
+    <div class="roles-grid">
+      <div class="role-card">
+        <h4><span class="role ret">Retailer</span></h4>
+        <p>Sells beer to customers. Faces real consumer demand.</p>
+      </div>
+      <div class="role-card">
+        <h4><span class="role who">Wholesaler</span></h4>
+        <p>Supplies the Retailer. Sees only the Retailer's orders.</p>
+      </div>
+      <div class="role-card">
+        <h4><span class="role dis">Distributor</span></h4>
+        <p>Supplies the Wholesaler. One more step removed from the customer.</p>
+      </div>
+      <div class="role-card">
+        <h4><span class="role man">Manufacturer</span></h4>
+        <p>Produces the beer. Furthest from real demand — hardest to predict.</p>
+      </div>
+    </div>
+    <div class="tip"><strong>Odd number of players?</strong> Some players get two roles and will see two order cards each round.</div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-num">3</div>
+    <h2><span class="num">3</span> The Supply Chain</h2>
+    <p>Beer flows from the Factory through the chain to the Customer. Orders flow the other way. Each shipment takes <strong>2 weeks</strong> to arrive (the "lead time").</p>
+    <div class="mockup">
+      <div class="chain">
+        <div class="chain-node"><div class="chain-icon">🏭</div><div class="chain-label" style="color:var(--man)">Factory</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🏗️</div><div class="chain-label" style="color:var(--dis)">Distributor</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🏬</div><div class="chain-label" style="color:var(--who)">Wholesaler</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🍺</div><div class="chain-label" style="color:var(--ret)">Retailer</div></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node"><div class="chain-icon">🧑</div><div class="chain-label">Customer</div></div>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:13px;margin-top:8px">
+        ← Orders flow this way &nbsp;|&nbsp; Beer flows that way →
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-num">4</div>
+    <h2><span class="num">4</span> Place Your Order</h2>
+    <p>Each round, an order panel appears below the game board. It shows you everything you need to decide:</p>
+
+    <div class="demo-panel" id="demoPanel">
+      <h3>
+        <span style="font-size:18px;font-weight:700">Round <span id="demoRound">1</span> / 10 — Place Your Orders</span>
+        <button class="btn btn-primary" id="demoSubmit" onclick="demoSubmitOrders()">Submit Orders</button>
+      </h3>
+      <div class="order-card">
+        <div class="order-header">
+          <span class="role ret">Retailer</span>
+          <span style="color:var(--muted);font-size:13px">Team 1</span>
+        </div>
+        <div class="stats-row">
+          <div><div class="stat-label">Demand</div><div class="stat-val demand" id="demoDemand">4</div></div>
+          <div><div class="stat-label">Inventory</div><div class="stat-val inv" id="demoInv">12</div></div>
+          <div><div class="stat-label">Backlog</div><div class="stat-val zero" id="demoBack">0</div></div>
+        </div>
+        <div class="meta-row">
+          <span>Pipeline: <span id="demoPipe">8</span></span>
+          <span>|</span>
+          <span>Incoming: <span id="demoIncoming">4</span></span>
+          <span>|</span>
+          <span>Cost so far: <span id="demoCost">0.00</span> EUR</span>
+        </div>
+        <div class="order-label">Your Order</div>
+        <input type="number" class="order-input" id="demoOrderInput" value="4" min="0">
+      </div>
+      <div class="waiting" id="demoWaiting">
+        <div class="spinner"></div>
+        <p>Waiting for other players... (<span id="demoProgress">1</span> / 4)</p>
+      </div>
+    </div>
+
+    <p style="margin-top:16px">Here's what each number means:</p>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:12px 0;font-size:15px">
+      <span class="stat-val demand" style="font-size:18px">Demand</span><span style="color:var(--muted)">How much your downstream partner ordered from you this week</span>
+      <span class="stat-val inv" style="font-size:18px">Inventory</span><span style="color:var(--muted)">How much beer you currently have in stock</span>
+      <span class="stat-val back" style="font-size:18px">Backlog</span><span style="color:var(--muted)">Unfulfilled orders — you owe these units and pay penalty costs</span>
+      <span style="font-size:18px;color:var(--muted);font-weight:700">Pipeline</span><span style="color:var(--muted)">Units already ordered but still in transit to you</span>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-num">5</div>
+    <h2><span class="num">5</span> Watch the Round Play Out</h2>
+    <p>Once all players have submitted, the round processes automatically. Trucks animate across the game board delivering beer along the supply chain.</p>
+    <p>A new order panel appears for the next round. Repeat until all rounds are complete.</p>
+    <div class="mockup">
+      <div class="mockup-title">Costs per Week</div>
+      <div style="display:flex;gap:24px;padding:8px 0;flex-wrap:wrap">
+        <div><span style="color:var(--green);font-weight:700">Holding: €0.50</span><span style="color:var(--muted)"> per unit in stock</span></div>
+        <div><span style="color:var(--red);font-weight:700">Backlog: €1.00</span><span style="color:var(--muted)"> per unit owed</span></div>
+      </div>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px">Your goal: minimize total cost. Too much stock is expensive — but running out is worse.</p>
+    </div>
+    <div class="tip"><strong>The trap:</strong> Because shipments take 2 weeks, you won't see the effect of your order immediately. It's tempting to over-order when backlog builds up — but that's exactly how the Bullwhip Effect starts.</div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step">
+    <div class="step-num">6</div>
+    <h2><span class="num">6</span> The Goal</h2>
+    <p>Keep costs low. Every unit sitting in your warehouse costs <strong>€0.50/week</strong>. Every unit of backlog costs <strong>€1.00/week</strong>.</p>
+    <p>The winning strategy? Stay calm. Order steadily. Don't panic when demand changes — your pipeline is already bringing supplies.</p>
+    <div class="mockup" style="text-align:center;padding:32px">
+      <div style="font-size:48px;margin-bottom:12px">🏆</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px">Best Team & Best Player</div>
+      <div style="color:var(--muted);font-size:15px">Lowest cumulative cost wins. Only scored rounds count (warmup rounds are excluded).</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Beer Distribution Game — Manual Play Mode Guide
+</div>
+
+<script>
+// Scroll reveal
+const steps = document.querySelectorAll('.step');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.15 });
+steps.forEach(s => obs.observe(s));
+
+// Demo interaction
+let demoState = { round: 1, inv: 12, backlog: 0, pipe: 8, cost: 0, demand: 4 };
+
+function demoSubmitOrders() {
+  const order = parseInt(document.getElementById('demoOrderInput').value) || 0;
+  const btn = document.getElementById('demoSubmit');
+  const waiting = document.getElementById('demoWaiting');
+  const input = document.getElementById('demoOrderInput');
+
+  btn.classList.add('btn-disabled');
+  input.disabled = true;
+  waiting.style.display = 'block';
+
+  // Simulate waiting
+  let progress = 1;
+  const iv = setInterval(() => {
+    progress++;
+    document.getElementById('demoProgress').textContent = progress;
+    if (progress >= 4) {
+      clearInterval(iv);
+      setTimeout(() => processRound(order), 500);
+    }
+  }, 600);
+}
+
+function processRound(order) {
+  const s = demoState;
+  // Simple simulation
+  const incoming = Math.min(s.pipe, 4);
+  s.inv += incoming;
+  s.pipe -= incoming;
+  s.pipe += order;
+
+  // Fulfill demand
+  const canShip = Math.min(s.demand + s.backlog, s.inv);
+  s.inv -= canShip;
+  const unfulfilled = (s.demand + s.backlog) - canShip;
+  s.backlog = unfulfilled;
+
+  // Costs
+  s.cost += s.inv * 0.5 + s.backlog * 1.0;
+  s.round++;
+
+  // New demand (step up after round 4)
+  s.demand = s.round >= 4 ? 8 : 4;
+
+  // Update UI
+  document.getElementById('demoRound').textContent = s.round;
+  document.getElementById('demoDemand').textContent = s.demand;
+  document.getElementById('demoInv').textContent = s.inv;
+  document.getElementById('demoInv').className = 'stat-val ' + (s.inv > 0 ? 'inv' : 'zero');
+  document.getElementById('demoBack').textContent = s.backlog;
+  document.getElementById('demoBack').className = 'stat-val ' + (s.backlog > 0 ? 'back' : 'zero');
+  document.getElementById('demoPipe').textContent = s.pipe;
+  document.getElementById('demoIncoming').textContent = Math.min(s.pipe, 4);
+  document.getElementById('demoCost').textContent = s.cost.toFixed(2);
+  document.getElementById('demoOrderInput').value = s.demand;
+  document.getElementById('demoOrderInput').disabled = false;
+  document.getElementById('demoSubmit').classList.remove('btn-disabled');
+  document.getElementById('demoWaiting').style.display = 'none';
+  document.getElementById('demoProgress').textContent = '1';
+}
+</script>
+</body>
+</html>

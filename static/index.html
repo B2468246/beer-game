@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=26">
+<link rel="stylesheet" href="/static/style.css?v=27">
 </head>
 <body>
 
@@ -889,6 +889,16 @@
     </div>
 </div>
 
+<!-- Guide (shown before design or human play) -->
+<div class="screen" id="screen-student-guide">
+    <div style="position:relative;width:100%;max-width:1200px;margin:0 auto">
+        <iframe id="guideIframe" src="" style="width:100%;height:82vh;border:none;border-radius:16px;background:#0F1923"></iframe>
+        <div style="text-align:center;margin-top:16px">
+            <button class="btn btn-primary btn-lg" onclick="dismissGuide()" style="min-width:260px;font-size:18px">Got it — Let's Play!</button>
+        </div>
+    </div>
+</div>
+
 <!-- Agent Design (student) -->
 <div class="screen" id="screen-student-design">
     <div class="card">
@@ -1750,6 +1760,46 @@ function showScreen(id) {
     const gearScreens = new Set(['screen-setup', 'screen-join']);
     document.body.classList.toggle('gear-bg-active', gearScreens.has(id));
 
+    // Exit fullscreen game board if leaving the playing screen
+    if (id !== 'screen-student-playing' && id !== 'screen-prof-playing') {
+        const b = document.getElementById('gameBoard');
+        if (b && b.classList.contains('fullscreen')) {
+            b.classList.remove('fullscreen');
+            const btn = b.querySelector('.fullscreen-btn');
+            if (btn) btn.textContent = '⛶ Fullscreen';
+        }
+        document.body.style.overflow = '';
+    }
+}
+
+// ── Guide Screen ──────────────────────────────────────
+// Track whether guide was already shown this session (per mode)
+const guideShown = { human: false, ai: false };
+let guidePendingScreen = null;   // screen to show after guide dismissed
+let guidePendingSetup = null;    // callback to run after guide dismissed
+
+function showGuide(mode, nextScreen, setupFn) {
+    const key = mode === 'human' ? 'human' : 'ai';
+    if (guideShown[key]) {
+        // Already shown — skip guide
+        if (setupFn) setupFn();
+        showScreen(nextScreen);
+        return;
+    }
+    guideShown[key] = true;
+    guidePendingScreen = nextScreen;
+    guidePendingSetup = setupFn || null;
+    const src = mode === 'human' ? '/static/guide-human.html' : '/static/guide-ai.html';
+    document.getElementById('guideIframe').src = src;
+    showScreen('screen-student-guide');
+}
+
+function dismissGuide() {
+    document.getElementById('guideIframe').src = '';
+    if (guidePendingSetup) guidePendingSetup();
+    if (guidePendingScreen) showScreen(guidePendingScreen);
+    guidePendingScreen = null;
+    guidePendingSetup = null;
 }
 
 // ── API helpers ────────────────────────────────────────
@@ -1838,7 +1888,13 @@ function handleWSMessage(msg) {
             break;
         case 'game_begin':
             if (msg.play_mode) APP.playMode = msg.play_mode;
-            if (APP.isStudent) showScreen('screen-student-playing');
+            if (APP.isStudent) {
+                if (APP.playMode === 'human') {
+                    showGuide('human', 'screen-student-playing');
+                } else {
+                    showScreen('screen-student-playing');
+                }
+            }
             else showScreen('screen-prof-playing');
             break;
         case 'order_request':
@@ -2850,12 +2906,13 @@ function handleStudentGameStarted(msg) {
                 APP.roles = member.roles;
                 APP.activeRole = APP.roles[0];
                 if (APP.playMode === 'human') {
-                    // Human mode: skip design, go straight to playing
-                    // (game_begin WS will show the playing screen)
+                    // Human mode: skip design — guide shown on game_begin
                     return;
                 }
-                buildDesignScreenFromTeam(team, msg.teams);
-                showScreen('screen-student-design');
+                // AI mode: show guide first, then design screen
+                showGuide('ai', 'screen-student-design', () => {
+                    buildDesignScreenFromTeam(team, msg.teams);
+                });
                 return;
             }
         }
