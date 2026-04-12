@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=24">
+<link rel="stylesheet" href="/static/style.css?v=25">
 </head>
 <body>
 
@@ -1491,12 +1491,10 @@
         </div>
     </div>
 
-    <!-- Round progress -->
-    <div class="card mt-16">
-        <div class="flex justify-between items-center">
-            <h2 id="studentRoleTitle">Your Role</h2>
-            <span class="progress-text" id="studentRoundProgress">Round 0 / 20</span>
-        </div>
+    <!-- Round progress (hidden, kept for JS refs) -->
+    <div style="display:none">
+        <h2 id="studentRoleTitle">Your Role</h2>
+        <span id="studentRoundProgress">Round 0 / 20</span>
         <div class="progress-bar"><div class="fill" id="studentRoundBar" style="width:0%"></div></div>
     </div>
 
@@ -3150,7 +3148,7 @@ function animateTrucksIn() {
     if (_truckAnim.rafId) cancelAnimationFrame(_truckAnim.rafId);
     _truckAnim.progress = 0;
     _truckAnim.startTime = null;
-    const DURATION = 1500; // ms
+    const DURATION = 3000; // ms
 
     function step(ts) {
         if (!_truckAnim.startTime) _truckAnim.startTime = ts;
