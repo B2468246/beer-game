@@ -3,8 +3,9 @@
   "configurations": [
     {
       "name": "beer-game",
+      "cwd": "/Users/benrickert/Desktop/Beer Game",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["server.py"],
+      "runtimeArgs": ["/Users/benrickert/Desktop/Beer Game/server.py"],
       "port": 8000
     },
     {

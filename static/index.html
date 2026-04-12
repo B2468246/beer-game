@@ -2366,15 +2366,16 @@ function renderBullwhip(bullwhip, teams, containerId, cardId) {
     const card = document.getElementById(cardId);
     const body = document.getElementById(containerId);
     if (!card || !body || !bullwhip) return;
+    const ROLES_BW = ['Retailer', 'Wholesaler', 'Distributor', 'Manufacturer'];
     const teamNames = {};
     (teams || []).forEach(t => { teamNames[t.id] = t.name; });
     let html = '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="border-bottom:2px solid var(--border)">' +
         '<th style="text-align:left;padding:8px 6px">Team</th>' +
-        ROLES.map(r => `<th style="text-align:center;padding:8px 6px"><span class="role-badge ${r}">${r}</span></th>`).join('') +
+        ROLES_BW.map(r => `<th style="text-align:center;padding:8px 6px"><span class="role-badge ${r}">${r}</span></th>`).join('') +
         '</tr></thead><tbody>';
     for (const [tid, bw] of Object.entries(bullwhip)) {
         html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px;font-weight:600">${escapeHtml(teamNames[tid] || tid)}</td>`;
-        ROLES.forEach(r => {
+        ROLES_BW.forEach(r => {
             const val = bw[r] || 0;
             const color = val > 2 ? '#E74C3C' : val > 1.2 ? '#E67E22' : '#27AE60';
             html += `<td style="text-align:center;padding:8px 6px;font-weight:700;color:${color}">${val.toFixed(2)}</td>`;
