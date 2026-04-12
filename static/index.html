@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=19">
+<link rel="stylesheet" href="/static/style.css?v=20">
 </head>
 <body>
 
@@ -2900,12 +2900,20 @@ const BUILDING_POS = {
     Customer:     { x: 170,  y: 420 },
 };
 
-// Info card positions (next to buildings, always within 1800x1000 viewBox)
-const CARD_POS = {
-    Retailer:     { x: 480,  y: 140, w: 220, h: 210 },
-    Wholesaler:   { x: 1100, y: 140, w: 220, h: 210 },
-    Distributor:  { x: 100,  y: 520, w: 220, h: 210 },
-    Manufacturer: { x: 850,  y: 520, w: 220, h: 210 },
+// Info card positions: two layouts
+// SOLO layout (all 4 roles): 2x2 grid in the center of the board
+const CARD_POS_SOLO = {
+    Retailer:     { x: 520,  y: 80,  w: 210, h: 200 },
+    Wholesaler:   { x: 1080, y: 80,  w: 210, h: 200 },
+    Distributor:  { x: 520,  y: 500, w: 210, h: 200 },
+    Manufacturer: { x: 1080, y: 500, w: 210, h: 200 },
+};
+// SINGLE role layout: one card prominently placed near the player's building
+const CARD_POS_SINGLE = {
+    Retailer:     { x: 500,  y: 100, w: 240, h: 230 },
+    Wholesaler:   { x: 1080, y: 100, w: 240, h: 230 },
+    Distributor:  { x: 500,  y: 500, w: 240, h: 230 },
+    Manufacturer: { x: 1080, y: 500, w: 240, h: 230 },
 };
 
 // Road segment mapping:
@@ -3112,8 +3120,11 @@ function renderGameBoard(roleData, round, totalRounds, teamsSummary) {
         const myRoles = APP.roles || [];
         const isSolo = myRoles.length === 4; // player controls all 4 roles
 
+        // Pick the right card layout
+        const cardLayout = isSolo ? CARD_POS_SOLO : CARD_POS_SINGLE;
+
         stages.forEach(s => {
-            const cp = CARD_POS[s];
+            const cp = cardLayout[s];
             if (!cp) return;
             const isMe = s === role;
 
