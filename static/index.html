@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beer Game</title>
-<link rel="stylesheet" href="/static/style.css?v=22">
+<link rel="stylesheet" href="/static/style.css?v=23">
 </head>
 <body>
 
@@ -725,6 +725,15 @@
         <div>
             <div class="card">
                 <h2>Game Settings</h2>
+                <div class="form-group mb-20">
+                    <label style="font-weight:700;font-size:16px">Play Mode</label>
+                    <div class="flex gap-12 mt-8">
+                        <button id="mode-ai" class="btn btn-primary" onclick="setPlayMode('ai')" style="flex:1">🤖 AI Agents</button>
+                        <button id="mode-human" class="btn btn-outline" onclick="setPlayMode('human')" style="flex:1">🧑 Human Players</button>
+                    </div>
+                    <div class="hint mt-4" id="playModeHint">AI agents decide orders based on strategies designed by students.</div>
+                </div>
+                <div class="divider"></div>
                 <div class="settings-grid">
                     <div class="form-group">
                         <label>Rounds per Game</label>
@@ -1588,6 +1597,20 @@
     </div>
 </div>
 
+<!-- Human Order Input Modal -->
+<div class="modal-backdrop" id="humanOrderModal" style="display:none">
+    <div class="modal-card" style="max-width:520px">
+        <h2 id="humanOrderTitle">Round 1 — Place Your Orders</h2>
+        <div id="humanOrderForms"></div>
+        <div class="flex gap-12 mt-16" style="justify-content:flex-end">
+            <button class="btn btn-primary btn-lg" id="humanOrderSubmitBtn" onclick="submitHumanOrders()">Submit Orders</button>
+        </div>
+        <div id="humanOrderWaiting" style="display:none" class="text-muted text-center mt-12">
+            <p>Waiting for other players... <span id="humanOrderProgress"></span></p>
+        </div>
+    </div>
+</div>
+
 <script>
 // ── State ──────────────────────────────────────────────
 const APP = {
@@ -1599,6 +1622,7 @@ const APP = {
     roles: [],
     activeRole: null,
     teamId: null,
+    playMode: 'ai',
 };
 
 // ── Init ───────────────────────────────────────────────
@@ -1805,6 +1829,7 @@ function handleWSMessage(msg) {
             updatePlayerList(msg.players, msg.player_count);
             break;
         case 'game_started':
+            if (msg.play_mode) APP.playMode = msg.play_mode;
             if (APP.isStudent) handleStudentGameStarted(msg);
             else handleProfGameStarted(msg);
             break;
@@ -1815,14 +1840,22 @@ function handleWSMessage(msg) {
             updateReadyProgress(msg.ready_count, msg.total_count);
             break;
         case 'game_begin':
+            if (msg.play_mode) APP.playMode = msg.play_mode;
             if (APP.isStudent) showScreen('screen-student-playing');
             else showScreen('screen-prof-playing');
+            break;
+        case 'order_request':
+            if (APP.isStudent) handleOrderRequest(msg);
+            break;
+        case 'order_submitted':
+            handleOrderSubmitted(msg);
             break;
         case 'round_processing':
             { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = ''; }
             break;
         case 'round_complete':
             { const n = document.getElementById('roundProcessingNote'); if (n) n.style.display = 'none'; }
+            { const m = document.getElementById('humanOrderModal'); if (m) m.style.display = 'none'; }
             handleRoundComplete(msg);
             break;
         case 'player_unlocked':
@@ -1849,6 +1882,7 @@ function handleWSMessage(msg) {
                 const el = document.getElementById(`set-${k}`);
                 if (el) el.value = v;
             }
+            if (msg.settings.play_mode) setPlayMode(msg.settings.play_mode, true);
             break;
         case 'kicked_all':
             if (APP.isStudent) {
@@ -2108,6 +2142,7 @@ function initLobbyFromState(s) {
         if (el) el.value = v;
     }
     updateDemandType(s.settings.demand_type);
+    if (s.settings.play_mode) setPlayMode(s.settings.play_mode, true);
     // Restore players
     if (s.players) {
         const players = {};
@@ -2175,6 +2210,19 @@ async function studentPlayAgain() {
 }
 
 // ── Settings ───────────────────────────────────────────
+function setPlayMode(mode, fromServer) {
+    APP.playMode = mode;
+    const aiBtn = document.getElementById('mode-ai');
+    const humanBtn = document.getElementById('mode-human');
+    const hint = document.getElementById('playModeHint');
+    if (aiBtn) aiBtn.className = mode === 'ai' ? 'btn btn-primary' : 'btn btn-outline';
+    if (humanBtn) humanBtn.className = mode === 'human' ? 'btn btn-primary' : 'btn btn-outline';
+    if (hint) hint.textContent = mode === 'ai'
+        ? 'AI agents decide orders based on strategies designed by students.'
+        : 'Students manually enter order quantities each round.';
+    if (!fromServer) updateSetting('play_mode', mode);
+}
+
 async function updateSetting(key, value) {
     const v = ['rounds','lead_time','initial_inventory','initial_pipeline','step_demand_before',
                'step_demand_after','step_round','total_games'].includes(key) ? parseInt(value) :
@@ -2196,6 +2244,11 @@ async function startGame() {
 }
 
 function handleProfGameStarted(msg) {
+    if (APP.playMode === 'human') {
+        // Human mode: skip designing, professor goes to playing screen
+        // (game_begin WS message will handle this)
+        return;
+    }
     showScreen('screen-prof-designing');
     renderTeamsOverview(msg.teams);
     updateLockInProgress(0, countTotalPlayers(msg.teams));
@@ -2758,6 +2811,7 @@ function handleReconnect(s) {
     const player = s.players[APP.playerId];
     APP.roles = player.roles || [];
     APP.activeRole = APP.roles[0] || null;
+    if (s.settings && s.settings.play_mode) APP.playMode = s.settings.play_mode;
     // Find team
     for (const t of s.teams) {
         if (t.members.some(m => (m.id || m) === APP.playerId)) {
@@ -2798,6 +2852,11 @@ function handleStudentGameStarted(msg) {
                 APP.teamId = team.id;
                 APP.roles = member.roles;
                 APP.activeRole = APP.roles[0];
+                if (APP.playMode === 'human') {
+                    // Human mode: skip design, go straight to playing
+                    // (game_begin WS will show the playing screen)
+                    return;
+                }
                 buildDesignScreenFromTeam(team, msg.teams);
                 showScreen('screen-student-design');
                 return;
@@ -2896,6 +2955,106 @@ function initStudentPlayingFromState(s) {
             // render
         }
         renderStudentRoleData(s.rounds_data[APP.teamId], s.current_round, s.total_rounds, s.teams_summary);
+    }
+}
+
+// ── Human Mode: Order Input ──────────────────────────
+function handleOrderRequest(msg) {
+    const modal = document.getElementById('humanOrderModal');
+    const title = document.getElementById('humanOrderTitle');
+    const forms = document.getElementById('humanOrderForms');
+    const submitBtn = document.getElementById('humanOrderSubmitBtn');
+    const waiting = document.getElementById('humanOrderWaiting');
+
+    title.textContent = `Round ${msg.round} / ${msg.total_rounds} — Place Your Orders`;
+
+    // Find requests for this player
+    const myRequests = (msg.requests || []).filter(r => r.player_id === APP.playerId);
+    if (!myRequests.length) return;
+
+    forms.innerHTML = myRequests.map(r => `
+        <div class="card mb-12" style="background:var(--bg);padding:16px">
+            <div class="flex justify-between items-center mb-8">
+                <span class="role-badge ${r.role}" style="font-size:15px">${r.role}</span>
+                <span class="text-muted text-sm">${r.team_name}</span>
+            </div>
+            <div class="settings-grid" style="gap:8px;grid-template-columns:1fr 1fr 1fr">
+                <div class="text-center">
+                    <div class="text-muted text-xs">Demand</div>
+                    <div style="font-size:22px;font-weight:800;color:#E67E22">${r.demand}</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-muted text-xs">Inventory</div>
+                    <div style="font-size:22px;font-weight:800;color:${r.inventory > 0 ? '#27AE60' : '#95a5a6'}">${r.inventory}</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-muted text-xs">Backlog</div>
+                    <div style="font-size:22px;font-weight:800;color:${r.backlog > 0 ? '#E74C3C' : '#95a5a6'}">${r.backlog}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-8 mt-8" style="font-size:12px;color:var(--text-muted)">
+                <span>Pipeline: ${r.pipeline}</span>
+                <span>|</span>
+                <span>Incoming: ${r.incoming_shipment}</span>
+                <span>|</span>
+                <span>Cost so far: ${r.cumulative_cost.toFixed(2)} EUR</span>
+            </div>
+            <div class="form-group mt-12" style="margin-bottom:0">
+                <label style="font-weight:700">Your Order</label>
+                <input type="number" id="human-order-${r.role}" class="human-order-input"
+                       data-role="${r.role}" data-team="${r.team_id}"
+                       value="${r.demand}" min="0" style="font-size:20px;text-align:center;font-weight:700"
+                       onkeydown="if(event.key==='Enter')submitHumanOrders()">
+            </div>
+        </div>
+    `).join('');
+
+    submitBtn.style.display = '';
+    waiting.style.display = 'none';
+    modal.style.display = '';
+
+    // Focus the first input
+    setTimeout(() => {
+        const first = forms.querySelector('.human-order-input');
+        if (first) first.focus();
+    }, 100);
+}
+
+async function submitHumanOrders() {
+    const inputs = document.querySelectorAll('.human-order-input');
+    const submitBtn = document.getElementById('humanOrderSubmitBtn');
+    const waiting = document.getElementById('humanOrderWaiting');
+
+    submitBtn.style.display = 'none';
+
+    for (const input of inputs) {
+        const order = parseInt(input.value) || 0;
+        const role = input.dataset.role;
+        const teamId = input.dataset.team;
+        await api('/api/submit-order', {
+            player_id: APP.playerId,
+            team_id: teamId,
+            role: role,
+            order: Math.max(0, order),
+        });
+    }
+
+    // Disable inputs
+    inputs.forEach(i => i.disabled = true);
+    waiting.style.display = '';
+}
+
+function handleOrderSubmitted(msg) {
+    const progress = document.getElementById('humanOrderProgress');
+    if (progress) {
+        progress.textContent = `(${msg.orders_received} / ${msg.orders_expected})`;
+    }
+    // If all orders are in, hide the modal (round_complete will follow)
+    if (msg.orders_received >= msg.orders_expected) {
+        setTimeout(() => {
+            const modal = document.getElementById('humanOrderModal');
+            if (modal) modal.style.display = 'none';
+        }, 500);
     }
 }
 

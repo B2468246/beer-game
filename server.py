@@ -45,6 +45,7 @@ def default_settings() -> dict:
         "step_round": 5,
         "demand_std": 2,
         "total_games": 3,
+        "play_mode": "ai",           # "ai" or "human"
     }
 
 
@@ -66,6 +67,12 @@ def make_empty_session(session_id: str, name: str = "") -> dict:
 
 sessions: dict[str, dict] = {}                      # session_id -> state dict
 session_ws_clients: dict[str, list[WebSocket]] = {} # session_id -> [ws, ...]
+
+# Human-mode order collection per session.
+# Structure: {session_id: {team_id: {role: order_value}}}
+pending_human_orders: dict[str, dict] = {}
+# Event fired when all orders for current round are in.
+human_orders_ready: dict[str, asyncio.Event] = {}
 
 # Single API key shared across sessions for the duration of the container.
 # Kept in memory only; never persisted to disk.
@@ -452,23 +459,117 @@ async def run_game():
         team_states[team["id"]] = init_team_state(team)
         state["rounds_data"][team["id"]] = {role: [] for role in ROLES}
 
+    is_human = settings.get("play_mode") == "human"
+    sid = _current_session_id.get()
+
     for round_num in range(1, n_rounds + 1):
         state["current_round"] = round_num
         customer_demand = demand_seq[round_num - 1]
 
-        # Tell clients the round is being computed (so they hide stale team
-        # summary charts until the new numbers arrive).
-        await broadcast({
-            "type": "round_processing",
-            "round": round_num,
-            "total_rounds": n_rounds,
-        })
+        if is_human:
+            # --- Human mode: ask players for orders, then wait ---
+            # Compute demand each role sees BEFORE asking for orders
+            round_demands = {}  # {team_id: {role: demand}}
+            for team in state["teams"]:
+                ts = team_states[team["id"]]
+                team_demands = {}
+                for i, role in enumerate(ROLES):
+                    if role == "Retailer":
+                        team_demands[role] = customer_demand
+                    else:
+                        downstream = ROLES[i - 1]
+                        prev_rounds = state["rounds_data"][team["id"]][downstream]
+                        if prev_rounds:
+                            team_demands[role] = prev_rounds[-1]["order"]
+                        else:
+                            team_demands[role] = settings.get("step_demand_before", 4)
+                round_demands[team["id"]] = team_demands
 
-        # Process all teams concurrently for this round
-        tasks = []
-        for team in state["teams"]:
-            tasks.append(process_team_round(team, team_states[team["id"]], round_num, customer_demand, settings))
-        await asyncio.gather(*tasks)
+            # Prepare pending orders storage
+            pending_human_orders[sid] = {}
+            event = asyncio.Event()
+            human_orders_ready[sid] = event
+
+            # Count total orders expected
+            total_expected = len(state["teams"]) * len(ROLES)
+
+            # Build order requests for all roles and broadcast
+            order_requests = []
+            for team in state["teams"]:
+                ts = team_states[team["id"]]
+                for role in ROLES:
+                    rs = ts[role]
+                    incoming = rs["pipeline"][0] if rs["pipeline"] else 0
+                    player_id = team["role_map"][role]
+                    order_requests.append({
+                        "player_id": player_id,
+                        "role": role,
+                        "team_id": team["id"],
+                        "team_name": team["name"],
+                        "demand": round_demands[team["id"]][role],
+                        "inventory": rs["inventory"] + incoming,
+                        "backlog": rs["backlog"],
+                        "pipeline": sum(rs["pipeline"]),
+                        "incoming_shipment": incoming,
+                        "cumulative_cost": rs["cumulative_cost"],
+                        "holding_cost": settings["holding_cost"],
+                        "backlog_cost": settings["backlog_cost"],
+                    })
+            await broadcast({
+                "type": "order_request",
+                "round": round_num,
+                "total_rounds": n_rounds,
+                "requests": order_requests,
+            })
+
+            # Also broadcast round_processing so professor sees progress
+            await broadcast({
+                "type": "round_processing",
+                "round": round_num,
+                "total_rounds": n_rounds,
+                "waiting_for_orders": True,
+            })
+
+            # Wait for all orders (timeout 5 minutes)
+            try:
+                await asyncio.wait_for(event.wait(), timeout=300)
+            except asyncio.TimeoutError:
+                # Fill missing orders with demand (safe default)
+                if sid not in pending_human_orders:
+                    pending_human_orders[sid] = {}
+                for team in state["teams"]:
+                    tid = team["id"]
+                    if tid not in pending_human_orders[sid]:
+                        pending_human_orders[sid][tid] = {}
+                    for role in ROLES:
+                        if role not in pending_human_orders[sid][tid]:
+                            pending_human_orders[sid][tid][role] = round_demands[tid][role]
+
+            # Process with collected orders
+            collected = pending_human_orders.pop(sid, {})
+            human_orders_ready.pop(sid, None)
+
+            tasks_list = []
+            for team in state["teams"]:
+                tasks_list.append(process_team_round_human(
+                    team, team_states[team["id"]], round_num,
+                    customer_demand, settings,
+                    collected.get(team["id"], {}),
+                ))
+            await asyncio.gather(*tasks_list)
+        else:
+            # --- AI mode (original behavior) ---
+            # Tell clients the round is being computed
+            await broadcast({
+                "type": "round_processing",
+                "round": round_num,
+                "total_rounds": n_rounds,
+            })
+
+            tasks = []
+            for team in state["teams"]:
+                tasks.append(process_team_round(team, team_states[team["id"]], round_num, customer_demand, settings))
+            await asyncio.gather(*tasks)
 
         save_state()
 
@@ -621,6 +722,70 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             "cost": round_cost,
             "cumulative_cost": rs["cumulative_cost"],
             "reasoning": reasoning,
+            "incoming_shipment": incoming,
+        })
+
+
+async def process_team_round_human(team: dict, ts: dict, round_num: int,
+                                    customer_demand: int, settings: dict,
+                                    orders: dict):
+    """Process one round for one team using human-submitted orders."""
+    lead_time = settings["lead_time"]
+
+    # Determine demand each stage receives
+    demands = {}
+    for i, role in enumerate(ROLES):
+        if role == "Retailer":
+            demands[role] = customer_demand
+        else:
+            downstream = ROLES[i - 1]
+            prev_rounds = state["rounds_data"][team["id"]][downstream]
+            if prev_rounds:
+                demands[role] = prev_rounds[-1]["order"]
+            else:
+                demands[role] = settings.get("step_demand_before", 4)
+
+    # Process each role
+    for role in ROLES:
+        rs = ts[role]
+
+        # 1. Receive incoming shipment
+        incoming = rs["pipeline"].pop(0) if rs["pipeline"] else 0
+        rs["inventory"] += incoming
+
+        # 2. Process demand
+        demand = demands[role]
+        rs["demands_received"].append(demand)
+        total_demand = demand + rs["backlog"]
+        shipped = min(rs["inventory"], total_demand)
+        rs["inventory"] -= shipped
+        rs["backlog"] = total_demand - shipped
+
+        # 3. Use human order (default to demand if missing)
+        order = orders.get(role, demand)
+        rs["orders_placed"].append(order)
+
+        # 4. Pipeline
+        rs["pipeline"].append(order)
+
+        # 5. Costs
+        round_cost = settings["holding_cost"] * rs["inventory"] + settings["backlog_cost"] * rs["backlog"]
+        rs["cumulative_cost"] += round_cost
+
+        # 6. Save round data
+        state["rounds_data"][team["id"]][role].append({
+            "round": round_num,
+            "demand": demand,
+            "inventory": rs["inventory"],
+            "backlog": rs["backlog"],
+            "pipeline": sum(rs["pipeline"]),
+            "pipeline_detail": list(rs["pipeline"]),
+            "shipped": shipped,
+            "outstanding": rs["outstanding"],
+            "order": order,
+            "cost": round_cost,
+            "cumulative_cost": rs["cumulative_cost"],
+            "reasoning": f"[Human] Ordered {order} units",
             "incoming_shipment": incoming,
         })
 
@@ -877,8 +1042,9 @@ async def update_settings(body: dict):
     """Professor updates game settings (only in lobby phase)."""
     if state["phase"] not in ("lobby", "setup"):
         return JSONResponse({"error": "Can only change settings before starting"}, status_code=400)
+    valid_keys = set(default_settings().keys())
     for k, v in body.items():
-        if k in state["settings"]:
+        if k in state["settings"] or k in valid_keys:
             state["settings"][k] = v
     state["demand_sequence"] = generate_demand_sequence(state["settings"])
     save_state()
@@ -930,8 +1096,6 @@ async def start_game():
         return JSONResponse({"error": "No players"}, status_code=400)
 
     state["teams"] = assign_teams(state["players"])
-    state["phase"] = "designing"
-    save_state()
 
     teams_info = []
     for team in state["teams"]:
@@ -941,7 +1105,18 @@ async def start_game():
             members.append({"id": pid, "name": p["name"], "roles": p["roles"]})
         teams_info.append({"id": team["id"], "name": team["name"], "members": members, "role_map": team["role_map"]})
 
-    await broadcast({"type": "game_started", "teams": teams_info})
+    is_human = state["settings"].get("play_mode") == "human"
+    if is_human:
+        # Skip designing — go straight to playing
+        state["phase"] = "designing"  # briefly set so _begin_game_internal works
+        save_state()
+        await broadcast({"type": "game_started", "teams": teams_info, "play_mode": "human"})
+        await _begin_game_internal()
+    else:
+        state["phase"] = "designing"
+        save_state()
+        await broadcast({"type": "game_started", "teams": teams_info, "play_mode": "ai"})
+
     return {"teams": teams_info}
 
 
@@ -1040,8 +1215,9 @@ async def _begin_game_internal():
     """Core begin logic, callable from /api/begin or auto from lock-in."""
     if state["phase"] != "designing":
         return
-    # Validate API key before starting the game
-    if not api_key_global:
+    # Validate API key before starting the game (only in AI mode)
+    is_human = state["settings"].get("play_mode") == "human"
+    if not is_human and not api_key_global:
         await broadcast({"type": "error", "message": "no_api_key",
                          "detail": "No Anthropic API key set. The professor must enter an API key before the game can start."})
         return
@@ -1053,7 +1229,8 @@ async def _begin_game_internal():
         state["players"][pid]["games_played"] = state["players"][pid].get("games_played", 0) + 1
     save_state()
 
-    await broadcast({"type": "game_begin", "total_rounds": state["settings"]["rounds"]})
+    await broadcast({"type": "game_begin", "total_rounds": state["settings"]["rounds"],
+                      "play_mode": state["settings"].get("play_mode", "ai")})
 
     # Capture the currently bound session id and rebind it inside the
     # background task so `state[...]`, `save_state()` and `broadcast()` keep
@@ -1068,6 +1245,44 @@ async def _begin_game_internal():
             _current_session_id.reset(token)
 
     asyncio.create_task(_run_game_in_session())
+
+
+@app.post("/api/submit-order")
+async def submit_order(body: dict):
+    """Human player submits their order for the current round."""
+    player_id = body.get("player_id")
+    team_id = body.get("team_id")
+    role = body.get("role")
+    order = body.get("order")
+    if not all([player_id, team_id, role]) or order is None:
+        return JSONResponse({"error": "Missing fields"}, status_code=400)
+    order = max(0, int(order))
+
+    sid = _current_session_id.get()
+    if sid not in pending_human_orders:
+        return JSONResponse({"error": "No round in progress"}, status_code=400)
+
+    # Store the order
+    pending_human_orders[sid].setdefault(team_id, {})[role] = order
+
+    # Check if all orders are in
+    total_expected = len(state["teams"]) * len(ROLES)
+    total_received = sum(len(roles) for roles in pending_human_orders[sid].values())
+
+    await broadcast({
+        "type": "order_submitted",
+        "player_id": player_id,
+        "role": role,
+        "orders_received": total_received,
+        "orders_expected": total_expected,
+    })
+
+    if total_received >= total_expected:
+        event = human_orders_ready.get(sid)
+        if event:
+            event.set()
+
+    return {"status": "ok", "orders_received": total_received, "orders_expected": total_expected}
 
 
 @app.post("/api/begin")
