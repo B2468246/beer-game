@@ -35,6 +35,17 @@ def default_settings() -> dict:
     return {
         "rounds": 10,
         "lead_time": 2,
+        # The Manufacturer's orders spend this many extra weeks in PRODUCTION before they
+        # enter the (lead_time-week) shipping pipeline, so the factory's goods take
+        # lead_time + factory_production_delay weeks total. =1 matches the canonical Beer
+        # Game (and the validated study engine in ../Beer Game/sim); =0 treats the factory
+        # like a normal stage, which makes that role systematically too cheap.
+        "factory_production_delay": 1,
+        # Zensimu's data scraper could not read the factory's TRUE incoming shipment and
+        # exported a frozen value (4). The LIVE game used the real value, and so does this
+        # app (None = show the real incoming). Set to 4 ONLY to reproduce the scraped study
+        # export byte-for-byte; the underlying mechanics always use the real value.
+        "factory_incoming_placeholder": None,
         "initial_inventory": 12,
         "initial_pipeline": 4,
         "holding_cost": 0.50,
@@ -443,6 +454,16 @@ def init_team_state(team: dict) -> dict:
             "demands_received": [],
             "pending_from_downstream": 0,  # unfulfilled orders from downstream role
         }
+
+    # Factory production delay: the Manufacturer gets a HIDDEN production queue. An order
+    # enters production first and only joins the shipping pipeline factory_production_delay
+    # weeks later (process_team_round step 1b), so its goods take lead_time + delay weeks
+    # total — the canonical Beer Game timing. Outstanding stays 0 at decision time (the
+    # queue is emptied into the pipeline in step 1b before each decision), so the shown
+    # inventory position counts production exactly once, via the pipeline.
+    prod_delay = state["settings"].get("factory_production_delay", 1)
+    if prod_delay:
+        team_state["Manufacturer"]["production_queue"] = [init_pipe] * prod_delay
     return team_state
 
 
@@ -632,6 +653,23 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
         rs["inventory"] += incoming
         round_incoming[role] = incoming
 
+    # ── Step 1b: Factory finished production enters its shipping pipeline ──
+    # The Manufacturer's order placed factory_production_delay weeks ago finishes
+    # production now and joins the shipping pipeline BEFORE this round's decision, so the
+    # factory's pipeline shows the full shipping leg and its goods take lead_time + delay
+    # weeks total. No-op when no production queue is configured (delay = 0).
+    mfg = ts["Manufacturer"]
+    if mfg.get("production_queue"):
+        mfg["pipeline"].append(mfg["production_queue"].pop(0))
+
+    # What the agent is SHOWN / what gets recorded as factory incoming. None = the real
+    # value (default); a number reproduces Zensimu's frozen scraper export. The mechanics
+    # above always used the real round_incoming.
+    _ph = settings.get("factory_incoming_placeholder")
+    disp_incoming = dict(round_incoming)
+    if _ph is not None:
+        disp_incoming["Manufacturer"] = _ph
+
     # Now each role fulfills demand from downstream's orders + own backlog
     for role in ROLES:
         rs = ts[role]
@@ -669,8 +707,13 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             "backlog": rs["backlog"],
             "pipeline": sum(rs["pipeline"]),
             "outstanding": rs["outstanding"],
-            "incoming_shipment": round_incoming[role],
-            "cumulative_cost": rs["cumulative_cost"],
+            "incoming_shipment": disp_incoming[role],
+            # Cost shown to the agent INCLUDES this round's holding/backlog, exactly like
+            # Zensimu's live store (W1 = 6, not 0). The recorded cumulative below ends up
+            # the same once this round's cost is applied in step 3.
+            "cumulative_cost": rs["cumulative_cost"]
+            + settings["holding_cost"] * rs["inventory"]
+            + settings["backlog_cost"] * rs["backlog"],
         }
 
         # Get player's strategy for this role
@@ -708,9 +751,14 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
         # Record the order
         rs["orders_placed"].append(order)
 
-        # Manufacturer: external supplier always ships full order after lead_time
+        # Manufacturer: the order STARTS PRODUCTION now. It joins the shipping pipeline
+        # factory_production_delay weeks later (step 1b), then ships over lead_time weeks.
         if role == "Manufacturer":
-            rs["pipeline"].append(order)
+            pq = rs.get("production_queue")
+            if pq is not None:
+                pq.append(order)
+            else:
+                rs["pipeline"].append(order)   # no production delay configured
         else:
             # Order goes to upstream — track as outstanding.
             # The upstream will try to fulfill it next round.
@@ -734,7 +782,7 @@ async def process_team_round(team: dict, ts: dict, round_num: int, customer_dema
             "cost": round_cost,
             "cumulative_cost": rs["cumulative_cost"],
             "reasoning": reasoning,
-            "incoming_shipment": round_incoming[role],
+            "incoming_shipment": disp_incoming[role],
         })
 
 
@@ -765,6 +813,18 @@ async def process_team_round_human(team: dict, ts: dict, round_num: int,
         rs["inventory"] += incoming
         round_incoming[role] = incoming
 
+    # ── Step 1b: Factory finished production enters its shipping pipeline (see the AI
+    # path for the rationale) — keeps the factory's lead at lead_time + delay weeks. ──
+    mfg = ts["Manufacturer"]
+    if mfg.get("production_queue"):
+        mfg["pipeline"].append(mfg["production_queue"].pop(0))
+
+    # Factory incoming as displayed/recorded (None = real value; see settings).
+    _ph = settings.get("factory_incoming_placeholder")
+    disp_incoming = dict(round_incoming)
+    if _ph is not None:
+        disp_incoming["Manufacturer"] = _ph
+
     # ── Step 2: Fulfill demand (ship to downstream) ──
     round_shipped = {}
     for role in ROLES:
@@ -792,9 +852,14 @@ async def process_team_round_human(team: dict, ts: dict, round_num: int,
         order = human_orders.get(role, demand)
         rs["orders_placed"].append(order)
 
-        # Manufacturer: external supplier always ships full order
+        # Manufacturer: the order starts production now and joins the shipping pipeline
+        # factory_production_delay weeks later (step 1b).
         if role == "Manufacturer":
-            rs["pipeline"].append(order)
+            pq = rs.get("production_queue")
+            if pq is not None:
+                pq.append(order)
+            else:
+                rs["pipeline"].append(order)
         else:
             rs["outstanding"] += order
 
@@ -816,7 +881,7 @@ async def process_team_round_human(team: dict, ts: dict, round_num: int,
             "cost": round_cost,
             "cumulative_cost": rs["cumulative_cost"],
             "reasoning": f"[Human] Ordered {order} units",
-            "incoming_shipment": round_incoming[role],
+            "incoming_shipment": disp_incoming[role],
         })
 
 
